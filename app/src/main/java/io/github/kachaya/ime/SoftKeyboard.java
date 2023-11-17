@@ -155,6 +155,10 @@ public class SoftKeyboard extends InputMethodService {
         if (ic != null) {
             ic.commitText(cs, 1);
         }
+        if (mCandidateIndex >= 0) {
+            TextView view = (TextView) mCandidateLayout.getChildAt(mCandidateIndex);
+            mDictionary.addLearning((String) view.getTag(), (String) view.getText());
+        }
         resetInput();
     }
 
@@ -180,8 +184,7 @@ public class SoftKeyboard extends InputMethodService {
                 // 候補未選択
             } else {
                 // 候補選択中→選択中の候補をコミット
-                TextView view = (TextView) mCandidateLayout.getChildAt(mCandidateIndex);
-                icCommitText(view.getText());
+                onClickCandidateText(mCandidateLayout.getChildAt(mCandidateIndex));
             }
         }
         mInputText.append(charCode);
@@ -237,8 +240,7 @@ public class SoftKeyboard extends InputMethodService {
                 icCommitText(mInputText);
             } else {
                 // 候補選択中→選択中の候補をコミット
-                TextView view = (TextView) mCandidateLayout.getChildAt(mCandidateIndex);
-                icCommitText(view.getText());
+                onClickCandidateText(mCandidateLayout.getChildAt(mCandidateIndex));
             }
         }
         resetShiftState();
@@ -321,8 +323,9 @@ public class SoftKeyboard extends InputMethodService {
         int style = R.style.CandidateText;
         for (int i = 0; i < list.size(); i++) {
             TextView view = new TextView(new ContextThemeWrapper(this, style), null, style);
-            view.setTag(i);
-            view.setText(list.get(i));
+            String[] ss = list.get(i).split("\t");
+            view.setTag(ss[0]);     // 確定時登録用テキスト
+            view.setText(ss[1]);    // 表示用テキスト
             view.setOnClickListener(this::onClickCandidateText);
             view.setSelected(false);
             view.setPressed(false);
@@ -332,6 +335,7 @@ public class SoftKeyboard extends InputMethodService {
 
     private void onClickCandidateText(View v) {
         TextView view = (TextView) v;
+        mCandidateIndex = mCandidateLayout.indexOfChild(view);
         icCommitText(view.getText());
     }
 
