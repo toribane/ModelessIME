@@ -17,7 +17,6 @@
 package io.github.kachaya.ime;
 
 import android.content.Context;
-import android.util.Log;
 
 import androidx.annotation.NonNull;
 
@@ -150,7 +149,6 @@ public class Dictionary {
                         break;
                     }
                     String value = (String) tuple.getValue();
-                    Log.i("search", value);
                     String[] ss = value.split("\t");
                     for (String s : ss) {
                         pair = key + "\t" + s;
@@ -207,7 +205,6 @@ public class Dictionary {
                     if (list.contains(pair)) {
                         continue;
                     }
-                    Log.i("predict", pair);
                     list.add(pair);
                 }
             }
