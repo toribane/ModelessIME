@@ -13,6 +13,7 @@ Android用のモードレスIMEを作るプロジェクトです。
 - [x] かな漢字変換
 - [x] 学習辞書
 - [x] 予測辞書
+- [ ] Graffiti入力
 - [ ] 表示速度改善
 - [ ] 辞書ツール
 - [ ] 後から変換
@@ -107,3 +108,4 @@ SudachiDict by Works Applications Co., Ltd. is licensed under the [Apache Licens
 
 This project includes UniDic and a part of NEologd.
 ```
+SudachiDictの*_lex.csvファイルから本ソフトウェア用の辞書ファイルを生成するためのツールは[DicTool](https://github.com/kachaya/DicTool)で公開しています。
