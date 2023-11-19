@@ -30,6 +30,8 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import androidx.annotation.NonNull;
+
 import java.util.ArrayList;
 
 public class SoftKeyboard extends InputMethodService {
@@ -50,6 +52,7 @@ public class SoftKeyboard extends InputMethodService {
     private ImageView mEnterKey;
 
     private final StringBuilder mInputText = new StringBuilder();
+    private String mLastCommit = "";
     private View mCandidateView;
     private ViewGroup mCandidateLayout;
     private int mCandidateIndex = -1;
@@ -150,16 +153,32 @@ public class SoftKeyboard extends InputMethodService {
         }
     }
 
-    private void icCommitText(CharSequence cs) {
+    // 候補未選択でEnterによる確定
+    private void icCommitInputText() {
+        String word = mInputText.toString();
         InputConnection ic = getCurrentInputConnection();
         if (ic != null) {
-            ic.commitText(cs, 1);
-        }
-        if (mCandidateIndex >= 0) {
-            TextView view = (TextView) mCandidateLayout.getChildAt(mCandidateIndex);
-            mDictionary.addLearning((String) view.getTag(), (String) view.getText());
+            ic.commitText(word, 1);
         }
         resetInput();
+    }
+
+    // 候補選択状態で確定
+    private void icCommitCandidateText(View v) {
+        TextView view = (TextView) v;
+        mCandidateIndex = mCandidateLayout.indexOfChild(view);
+        String keyword = (String) view.getTag();
+        String word = (String) view.getText();
+        InputConnection ic = getCurrentInputConnection();
+        if (ic != null) {
+            ic.commitText(word, 1);
+        }
+        mDictionary.addLearning(keyword, word);
+        mDictionary.addPrediction(mLastCommit, word);
+        mLastCommit = word;
+        resetInput();
+        ArrayList<String> list = mDictionary.predict(word);
+        buildCandidate(list);
     }
 
     private void onClickTextView(View v) {
@@ -184,12 +203,13 @@ public class SoftKeyboard extends InputMethodService {
                 // 候補未選択
             } else {
                 // 候補選択中→選択中の候補をコミット
-                onClickCandidateText(mCandidateLayout.getChildAt(mCandidateIndex));
+                icCommitCandidateText(mCandidateLayout.getChildAt(mCandidateIndex));
             }
         }
         mInputText.append(charCode);
         icSetComposingText(mInputText);
-        buildCandidate();
+        ArrayList<String> list = mDictionary.search(mInputText.toString(), 40);
+        buildCandidate(list);
         resetShiftState();
     }
 
@@ -200,7 +220,6 @@ public class SoftKeyboard extends InputMethodService {
         } else {
             if (mCandidateIndex < 0) {
                 // 候補未選択→最初の候補を選択状態にする
-                buildCandidate();
                 mCandidateIndex = 0;
             } else {
                 // 候補選択中→次の候補を選択状態にする、最後に達したら先頭に戻る
@@ -219,7 +238,13 @@ public class SoftKeyboard extends InputMethodService {
             if (mCandidateIndex < 0) {
                 // 候補未選択→入力テキストの最後の文字を削除して候補を作り直す
                 mInputText.deleteCharAt(mInputText.length() - 1);
-                buildCandidate();
+                ArrayList<String> list;
+                if (mInputText.length() == 0) {
+                    list = mDictionary.predict(mLastCommit);
+                } else {
+                    list = mDictionary.search(mInputText.toString(), 50);
+                }
+                buildCandidate(list);
             } else {
                 // 候補選択中→候補未選択に戻す
                 mCandidateIndex = -1;
@@ -237,10 +262,10 @@ public class SoftKeyboard extends InputMethodService {
         } else {
             if (mCandidateIndex < 0) {
                 // 候補未選択→入力テキストをそのままコミット
-                icCommitText(mInputText);
+                icCommitInputText();
             } else {
                 // 候補選択中→選択中の候補をコミット
-                onClickCandidateText(mCandidateLayout.getChildAt(mCandidateIndex));
+                icCommitCandidateText(mCandidateLayout.getChildAt(mCandidateIndex));
             }
         }
         resetShiftState();
@@ -313,30 +338,20 @@ public class SoftKeyboard extends InputMethodService {
     /*
      * 候補
      */
-    private void buildCandidate() {
+    private void buildCandidate(@NonNull ArrayList<String> list) {
         mCandidateIndex = -1;
         mCandidateLayout.removeAllViewsInLayout();
-        if (mInputText.length() == 0) {
-            return;
-        }
-        ArrayList<String> list = mDictionary.search(mInputText, 50);
         int style = R.style.CandidateText;
         for (int i = 0; i < list.size(); i++) {
             TextView view = new TextView(new ContextThemeWrapper(this, style), null, style);
             String[] ss = list.get(i).split("\t");
             view.setTag(ss[0]);     // 確定時登録用テキスト
             view.setText(ss[1]);    // 表示用テキスト
-            view.setOnClickListener(this::onClickCandidateText);
+            view.setOnClickListener(this::icCommitCandidateText);
             view.setSelected(false);
             view.setPressed(false);
             mCandidateLayout.addView(view);
         }
-    }
-
-    private void onClickCandidateText(View v) {
-        TextView view = (TextView) v;
-        mCandidateIndex = mCandidateLayout.indexOfChild(view);
-        icCommitText(view.getText());
     }
 
     private void selectCandidate() {
@@ -361,6 +376,10 @@ public class SoftKeyboard extends InputMethodService {
             } else {
                 view.setSelected(false);
             }
+        }
+        if (mCandidateIndex < 0) {
+            // 未選択ならば先頭にスクロールする
+            mCandidateView.scrollTo(0, 0);
         }
     }
 

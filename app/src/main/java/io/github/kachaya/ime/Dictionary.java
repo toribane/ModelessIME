@@ -45,6 +45,8 @@ public class Dictionary {
     private BTree mBTreeSystemDic;
     private RecordManager mRecmanLearningDic;
     private BTree mBTreeLearningDic;
+    private RecordManager mRecmanPredictionDic;
+    private BTree mBTreePredictionDic;
     private final ArrayList<BTree> dicList = new ArrayList<>();
 
     private void extractZip(@NonNull Context context, String zipFileName) {
@@ -81,6 +83,25 @@ public class Dictionary {
 
     public Dictionary(Context context) {
         extractZip(context, "system_dic.zip");
+
+        // 予測辞書
+        try {
+            Properties props = new Properties();
+            String name = context.getFilesDir().getAbsolutePath() + "/prediction_dic";
+            mRecmanPredictionDic = RecordManagerFactory.createRecordManager(name, props);
+            long recid = mRecmanPredictionDic.getNamedObject(BTREE_NAME);
+            if (recid == 0) {
+                mBTreePredictionDic = BTree.createInstance(mRecmanPredictionDic, new StringComparator());
+                mRecmanPredictionDic.setNamedObject(BTREE_NAME, mBTreePredictionDic.getRecid());
+                mRecmanPredictionDic.commit();
+            } else {
+                mBTreePredictionDic = BTree.load(mRecmanPredictionDic, recid);
+            }
+        } catch (IOException e) {
+            mRecmanPredictionDic = null;
+            mBTreePredictionDic = null;
+        }
+
         // 優先する辞書の順にdicListに追加する
         try {
             Properties props = new Properties();
@@ -91,11 +112,10 @@ public class Dictionary {
                 mBTreeLearningDic = BTree.createInstance(mRecmanLearningDic, new StringComparator());
                 mRecmanLearningDic.setNamedObject(BTREE_NAME, mBTreeLearningDic.getRecid());
                 mRecmanLearningDic.commit();
-                Log.i(getClass().getName(), "create learning dictoinary");
             } else {
                 mBTreeLearningDic = BTree.load(mRecmanLearningDic, recid);
-                Log.i(getClass().getName(), "load learning dictoinary");
             }
+
             dicList.add(mBTreeLearningDic);
         } catch (IOException e) {
             mRecmanLearningDic = null;
@@ -107,18 +127,18 @@ public class Dictionary {
             RecordManager recman = RecordManagerFactory.createRecordManager(name, props);
             long recid = recman.getNamedObject(BTREE_NAME);
             mBTreeSystemDic = BTree.load(recman, recid);
+
             dicList.add(mBTreeSystemDic);
         } catch (IOException e) {
             mBTreeSystemDic = null;
         }
     }
 
-    public ArrayList<String> search(@NonNull CharSequence cs, int limit) {
-        String keyword = cs.toString();
+    public ArrayList<String> search(String keyword, int limit) {
+        ArrayList<String> list = new ArrayList<>();
         String hiragana = Converter.romajiToHiragana(keyword);
         Tuple tuple = new Tuple();
         TupleBrowser browser;
-        ArrayList<String> list = new ArrayList<>();
         String pair;
         int num = 0;
         for (BTree btree : dicList) {
@@ -130,6 +150,7 @@ public class Dictionary {
                         break;
                     }
                     String value = (String) tuple.getValue();
+                    Log.i("search", value);
                     String[] ss = value.split("\t");
                     for (String s : ss) {
                         pair = key + "\t" + s;
@@ -169,28 +190,65 @@ public class Dictionary {
         return list;
     }
 
-    public void addLearning(String keyword, String word) {
-        if (mBTreeLearningDic == null) {
+    public ArrayList<String> predict(String keyword) {
+        ArrayList<String> list = new ArrayList<>();
+        if (mRecmanPredictionDic == null || mBTreePredictionDic == null) {
+            return list;
+        }
+        if (keyword.length() == 0) {
+            return list;
+        }
+        try {
+            String value = (String) mBTreePredictionDic.find(keyword);
+            if (value != null) {
+                String[] ss = value.split("\t");
+                for (String s : ss) {
+                    String pair = keyword + "\t" + s;
+                    if (list.contains(pair)) {
+                        continue;
+                    }
+                    Log.i("predict", pair);
+                    list.add(pair);
+                }
+            }
+        } catch (IOException ignored) {
+        }
+        return list;
+    }
+
+    private void add(String keyword, String word, RecordManager recman, BTree btree) {
+        if (recman == null || btree == null) {
             return;
         }
-        String hiragana = Converter.romajiToHiragana(keyword);
+        if (keyword.length() == 0 || word.length() == 0) {
+            return;
+        }
         try {
-            String value = (String) mBTreeLearningDic.find(hiragana);
+            String value = (String) btree.find(keyword);
             if (value == null) {
-                mBTreeLearningDic.insert(hiragana, word, true);
+                btree.insert(keyword, word, true);
             } else {
-                String[] ss = value.split("\t");
                 StringBuilder sb = new StringBuilder(word);
+                String[] ss = value.split("\t");
                 for (String s : ss) {
                     if (s.equals(word)) {
                         continue;
                     }
                     sb.append("\t").append(s);
                 }
-                mBTreeLearningDic.insert(hiragana, sb.toString(), true);
+                btree.insert(keyword, sb.toString(), true);
             }
-            mRecmanLearningDic.commit();
+            recman.commit();
         } catch (IOException ignored) {
         }
+    }
+
+    public void addLearning(String keyword, String word) {
+        String hiragana = Converter.romajiToHiragana(keyword);
+        add(hiragana, word, mRecmanLearningDic, mBTreeLearningDic);
+    }
+
+    public void addPrediction(String keyword, String word) {
+        add(keyword, word, mRecmanPredictionDic, mBTreePredictionDic);
     }
 }
