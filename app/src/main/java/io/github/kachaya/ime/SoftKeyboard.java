@@ -16,7 +16,7 @@
 
 package io.github.kachaya.ime;
 
-import android.annotation.SuppressLint;
+import android.content.SharedPreferences;
 import android.inputmethodservice.InputMethodService;
 import android.view.ContextThemeWrapper;
 import android.view.KeyEvent;
@@ -25,36 +25,23 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputConnection;
-import android.widget.GridLayout;
-import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
+import androidx.preference.PreferenceManager;
 
 import java.util.ArrayList;
 
 public class SoftKeyboard extends InputMethodService {
-    private final static int SHIFT_STATE_NONE = 0;
-    private final static int SHIFT_STATE_SINGLE = 1;
-    private final static int SHIFT_STATE_LOCK = 2;
-    private final static int SHIFT_STATE_NUM = 3;
-    private int mShiftState;
-
     private View mInputView;
-    private GridLayout mQwertyNormalLayout;
-    private GridLayout mQwertyShiftLayout;
-    private ImageView mShiftKey;
-    private ImageView mSpaceKey;
-    private ImageView mCursorLeftKey;
-    private ImageView mCursorRightKey;
-    private ImageView mBackspaceKey;
-    private ImageView mEnterKey;
+    private StrokeView mStrokeView;
+    private QwertyView mQwertyView;
+    private View mCandidateView;
+    private ViewGroup mCandidateLayout;
 
     private final StringBuilder mInputText = new StringBuilder();
     private String mLastCommit = "";
-    private View mCandidateView;
-    private ViewGroup mCandidateLayout;
     private int mCandidateIndex = -1;
 
     private Dictionary mDictionary;
@@ -76,7 +63,6 @@ public class SoftKeyboard extends InputMethodService {
      * To change the input view after the first one is created by this
      * function, use {@link #setInputView(View)}.
      */
-    @SuppressLint("ClickableViewAccessibility")
     @Override
     public View onCreateInputView() {
         LinearLayout layout = (LinearLayout) LayoutInflater.from(this).inflate(R.layout.input_layout, null);
@@ -85,39 +71,8 @@ public class SoftKeyboard extends InputMethodService {
         mCandidateView = layout.findViewById(R.id.candidate_view);
         mCandidateLayout = layout.findViewById(R.id.candidate_layout);
 
-        mQwertyNormalLayout = layout.findViewById(R.id.qwerty_normal);
-        for (int i = 0; i < mQwertyNormalLayout.getChildCount(); i++) {
-            View view = mQwertyNormalLayout.getChildAt(i);
-            if (view instanceof TextView) {
-                view.setOnClickListener(this::onClickTextView);
-            }
-        }
-
-        mQwertyShiftLayout = layout.findViewById(R.id.qwerty_shift);
-        for (int i = 0; i < mQwertyShiftLayout.getChildCount(); i++) {
-            View view = mQwertyShiftLayout.getChildAt(i);
-            if (view instanceof TextView) {
-                view.setOnClickListener(this::onClickTextView);
-            }
-        }
-
-        mShiftKey = layout.findViewById(R.id.key_shift);
-        mShiftKey.setOnClickListener(this::handleShift);
-
-        mSpaceKey = layout.findViewById(R.id.key_space);
-        mSpaceKey.setOnClickListener(this::handleSpace);
-
-        mCursorLeftKey = layout.findViewById(R.id.key_cursor_left);
-        mCursorLeftKey.setOnTouchListener(new RepeatListener(this::handleCursorLeft));
-
-        mCursorRightKey = layout.findViewById(R.id.key_cursor_right);
-        mCursorRightKey.setOnTouchListener(new RepeatListener(this::handleCursorRight));
-
-        mBackspaceKey = layout.findViewById(R.id.key_backspace);
-        mBackspaceKey.setOnTouchListener(new RepeatListener(this::handleBackspace));
-
-        mEnterKey = layout.findViewById(R.id.key_enter);
-        mEnterKey.setOnClickListener(this::handleEnter);
+        mStrokeView = layout.findViewById(R.id.stroke_view);
+        mQwertyView = layout.findViewById(R.id.qwerty_view);
 
         return mInputView;
     }
@@ -136,7 +91,19 @@ public class SoftKeyboard extends InputMethodService {
     @Override
     public void onStartInputView(EditorInfo editorInfo, boolean restarting) {
         super.onStartInputView(editorInfo, restarting);
-        mShiftState = SHIFT_STATE_NONE;
+        SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
+        String mKeyboardLayout = sharedPreferences.getString("keyboard_layout", "qwerty");
+        switch (mKeyboardLayout) {
+            default:
+            case "qwerty":
+                mQwertyView.setVisibility(View.VISIBLE);
+                mStrokeView.setVisibility(View.INVISIBLE);
+                break;
+            case "stroke":
+                mQwertyView.setVisibility(View.INVISIBLE);
+                mStrokeView.setVisibility(View.VISIBLE);
+                break;
+        }
         resetInput();
     }
 
@@ -181,21 +148,10 @@ public class SoftKeyboard extends InputMethodService {
         buildCandidate(list);
     }
 
-    private void onClickTextView(View v) {
-        CharSequence text = ((TextView) v).getText();
-        if (text == null) {
-            return;
-        }
-        if (text.length() == 0) {
-            return;
-        }
-        handleCharacter(text.charAt(0));
-    }
-
     /*
      * 各キー入力ハンドラ
      */
-    private void handleCharacter(char charCode) {
+    public void handleCharacter(char charCode) {
         if (mInputText.length() == 0) {
             // 未入力
         } else {
@@ -210,10 +166,9 @@ public class SoftKeyboard extends InputMethodService {
         icSetComposingText(mInputText);
         ArrayList<String> list = mDictionary.search(mInputText.toString(), 40);
         buildCandidate(list);
-        resetShiftState();
     }
 
-    public void handleSpace(View v) {
+    public void handleSpace() {
         if (mInputText.length() == 0) {
             // 未入力
             sendDownUpKeyEvents(KeyEvent.KEYCODE_SPACE);
@@ -227,10 +182,9 @@ public class SoftKeyboard extends InputMethodService {
             }
             selectCandidate();
         }
-        resetShiftState();
     }
 
-    public void handleBackspace(View v) {
+    public void handleBackspace() {
         if (mInputText.length() == 0) {
             // 未入力
             sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL);
@@ -252,10 +206,9 @@ public class SoftKeyboard extends InputMethodService {
             }
             icSetComposingText(mInputText);
         }
-        resetShiftState();
     }
 
-    public void handleEnter(View v) {
+    public void handleEnter() {
         if (mInputText.length() == 0) {
             // 未入力
             sendDownUpKeyEvents(KeyEvent.KEYCODE_ENTER);
@@ -268,10 +221,9 @@ public class SoftKeyboard extends InputMethodService {
                 icCommitCandidateText(mCandidateLayout.getChildAt(mCandidateIndex));
             }
         }
-        resetShiftState();
     }
 
-    public void handleCursorLeft(View v) {
+    public void handleCursorLeft() {
         if (mInputText.length() == 0) {
             // 未入力
             sendDownUpKeyEvents(KeyEvent.KEYCODE_DPAD_LEFT);
@@ -284,7 +236,7 @@ public class SoftKeyboard extends InputMethodService {
         }
     }
 
-    public void handleCursorRight(View v) {
+    public void handleCursorRight() {
         if (mInputText.length() == 0) {
             // 未入力
             sendDownUpKeyEvents(KeyEvent.KEYCODE_DPAD_RIGHT);
@@ -297,41 +249,39 @@ public class SoftKeyboard extends InputMethodService {
         }
     }
 
-    public void handleShift(View v) {
-        mShiftState = (mShiftState + 1) % SHIFT_STATE_NUM;
-        updateKeyboard();
-    }
-
-    private void resetShiftState() {
-        if (mShiftState != SHIFT_STATE_LOCK) {
-            mShiftState = SHIFT_STATE_NONE;
-            updateKeyboard();
-        }
-    }
-
-    /**
-     * キーボード表示更新
-     */
-    private void updateKeyboard() {
-        switch (mShiftState) {
-            default:
-                mShiftState = SHIFT_STATE_NONE;
-            case SHIFT_STATE_NONE:
-                mShiftKey.setImageResource(R.drawable.ic_shift_none);
-                break;
-            case SHIFT_STATE_SINGLE:
-                mShiftKey.setImageResource(R.drawable.ic_shift_single);
-                break;
-            case SHIFT_STATE_LOCK:
-                mShiftKey.setImageResource(R.drawable.ic_shift_lock);
-                break;
-        }
-        if (mShiftState == SHIFT_STATE_NONE) {
-            mQwertyNormalLayout.setVisibility(View.VISIBLE);
-            mQwertyShiftLayout.setVisibility(View.INVISIBLE);
+    public void handleCursorUp() {
+        if (mInputText.length() == 0) {
+            // 未入力
         } else {
-            mQwertyNormalLayout.setVisibility(View.INVISIBLE);
-            mQwertyShiftLayout.setVisibility(View.VISIBLE);
+            if (mCandidateIndex < 0) {
+                // 候補未選択
+            } else {
+                // 候補選択中
+            }
+        }
+    }
+
+    public void handleCursorDown() {
+        if (mInputText.length() == 0) {
+            // 未入力
+        } else {
+            if (mCandidateIndex < 0) {
+                // 候補未選択
+            } else {
+                // 候補選択中
+            }
+        }
+    }
+
+    public void handleSymbol() {
+        if (mInputText.length() == 0) {
+            // 未入力
+        } else {
+            if (mCandidateIndex < 0) {
+                // 候補未選択
+            } else {
+                // 候補選択中
+            }
         }
     }
 
