@@ -1,6 +1,8 @@
 # ModelessIME
 モードレスIME
 
+[![Workflow](https://github.com/kachaya/ModelessIME/actions/workflows/android.yml/badge.svg)](https://github.com/kachaya/ModelessIME/actions/workflows/android.yml)
+
 ## 概要
 Android用のモードレスIMEを作るプロジェクトです。
 
