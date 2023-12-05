@@ -1,43 +1,47 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_alignParentBottom="true"
-    android:background="@color/black"
     android:orientation="vertical">
 
     <HorizontalScrollView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="@color/gray2"
-        android:fillViewport="true"
         android:id="@+id/candidate_view"
-        android:scrollbars="none">
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/softkey_height"
+        android:fillViewport="true"
+        android:scrollbars="none"
+        tools:ignore="SpeakableTextPresentCheck">
 
         <LinearLayout
             android:id="@+id/candidate_layout"
             android:layout_width="wrap_content"
-            android:layout_height="48dp"
+            android:layout_height="match_parent"
             android:layout_gravity="center_vertical"
-            android:orientation="horizontal">
-            <!-- dynamic -->
-        </LinearLayout>
+            android:orientation="horizontal" />
     </HorizontalScrollView>
 
     <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content">
+        android:layout_height="@dimen/keyboard_height">
 
         <io.github.kachaya.ime.QwertyView
             android:id="@+id/qwerty_view"
             android:layout_width="match_parent"
-            android:layout_height="240dp"
-            android:visibility="visible" />
+            android:layout_height="match_parent"
+            android:visibility="invisible" />
 
         <io.github.kachaya.ime.StrokeView
             android:id="@+id/stroke_view"
             android:layout_width="match_parent"
-            android:layout_height="240dp"
+            android:layout_height="match_parent"
+            android:visibility="invisible" />
+
+        <io.github.kachaya.ime.SymbolView
+            android:id="@+id/symbol_view"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
             android:visibility="invisible" />
     </FrameLayout>
 </LinearLayout>

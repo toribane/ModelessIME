@@ -20,21 +20,15 @@ import android.annotation.SuppressLint;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
-import android.graphics.drawable.Drawable;
-import android.os.Handler;
-import android.os.Looper;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
-import android.view.View;
-import android.view.ViewConfiguration;
+import android.view.ViewGroup;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
 
 import androidx.annotation.NonNull;
-import androidx.core.content.res.ResourcesCompat;
 
-import java.util.ArrayList;
-
-public class QwertyView extends View {
-
+public class QwertyView extends KeyboardLayout {
     private final static int COLS = 12;
     private final static int ROWS = 4;
 
@@ -51,96 +45,30 @@ public class QwertyView extends View {
             'Z', 'X', 'C', 'V', 'B', 'N', 'M', '<', '>', '?', '_', '|',
     };
 
-    private final static int SOFTKEY_ID_SHIFT = -1;
-    private final static int SOFTKEY_ID_SPACE = -2;
-    private final static int SOFTKEY_ID_CURSOR_LEFT = -3;
-    private final static int SOFTKEY_ID_CURSOR_RIGHT = -4;
-    private final static int SOFTKEY_ID_BACKSPACE = -5;
-    private final static int SOFTKEY_ID_ENTER = -6;
-
-    private final static int repeatTimeout = ViewConfiguration.getKeyRepeatTimeout();
-    private final static int repeatDelay = ViewConfiguration.getKeyRepeatDelay();
-
-    private final Context mContext;
-    private final SoftKeyboard mSoftKeyboard;
-    private final Handler mRepeatHandler;
-    private final Drawable mShiftSingleDrawable;
-    private final Drawable mShiftLockDrawable;
-    private final Drawable mShiftNoneDrawable;
-
-    private final SoftKey mShiftKey;
-    private final SoftKey mSpaceKey;
-    private final SoftKey mCursorLeftKey;
-    private final SoftKey mCursorRightKey;
-    private final SoftKey mBackspaceKey;
-    private final SoftKey mEnterKey;
-    private final ArrayList<SoftKey> mSoftKeys;
-    private SoftKey mLastKey;
-    private SoftKey mRepeatKey;
-
-    private int mWidth;
-    private int mHeight;
-    private Bitmap mBitmap;
-    private Canvas mCanvas;
-    private int mBackgroundColor;
-
-    private boolean mShiftSingleFlag;
-    private boolean mShiftLockFlag;
-
-    private final Runnable mRepeatRunnable = new Runnable() {
-        @Override
-        public void run() {
-            if (mRepeatKey == null) {
-                return;
-            }
-            processSoftKey(mRepeatKey);
-            mRepeatHandler.postDelayed(this, repeatDelay);
-        }
-    };
-
     public QwertyView(Context context, AttributeSet attrs) {
         super(context, attrs);
 
-        mContext = context;
-        mSoftKeyboard = (SoftKeyboard) context;
+        setOrientation(VERTICAL);
 
-        mBackgroundColor = getResources().getColor(R.color.gray1, null);
-        mShiftNoneDrawable = ResourcesCompat.getDrawable(getResources(), R.drawable.ic_shift_none, null);
-        mShiftSingleDrawable = ResourcesCompat.getDrawable(getResources(), R.drawable.ic_shift_single, null);
-        mShiftLockDrawable = ResourcesCompat.getDrawable(getResources(), R.drawable.ic_shift_lock, null);
-
-        mShiftSingleFlag = false;
-        mShiftLockFlag = false;
-
-        mRepeatHandler = new Handler(Looper.getMainLooper());
-        mSoftKeys = new ArrayList<>();
+        mImageView = new ImageView(context);
+//        mImageView.setImageBitmap(mBitmap);
+        addView(mImageView, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1.0f));
 
         int id = 0;
         for (int row = 0; row < ROWS; row++) {
             for (int col = 0; col < COLS; col++) {
-                mSoftKeys.add(new SoftKey(id++));
+                SoftKey softKey = new SoftKey(id);
+                softKey.setColor(mKeyForegroundColor, mCharacterKeyBackgroundColor);
+                mSoftKeys.add(softKey);
+                id++;
             }
         }
-
-        mShiftKey = new SoftKey(SOFTKEY_ID_SHIFT);
         mSoftKeys.add(mShiftKey);
-
-        mSpaceKey = new SoftKey(SOFTKEY_ID_SPACE);
+        mSoftKeys.add(mSymbolViewKey);
         mSoftKeys.add(mSpaceKey);
-
-        mCursorLeftKey = new SoftKey(SOFTKEY_ID_CURSOR_LEFT);
-        mCursorLeftKey.setRepeatable(true);
         mSoftKeys.add(mCursorLeftKey);
-
-        mCursorRightKey = new SoftKey(SOFTKEY_ID_CURSOR_RIGHT);
-        mCursorRightKey.setRepeatable(true);
         mSoftKeys.add(mCursorRightKey);
-
-        mBackspaceKey = new SoftKey(SOFTKEY_ID_BACKSPACE);
-        mBackspaceKey.setRepeatable(true);
         mSoftKeys.add(mBackspaceKey);
-
-        mEnterKey = new SoftKey(SOFTKEY_ID_ENTER);
         mSoftKeys.add(mEnterKey);
     }
 
@@ -148,25 +76,11 @@ public class QwertyView extends View {
         if (mCanvas == null) {
             return;
         }
-
-        mBackgroundColor = getResources().getColor(R.color.gray1, null);
-
         mCanvas.drawColor(mBackgroundColor);
-        int foregoundColor = getResources().getColor(R.color.white, null);
-        int backgroundColor = getResources().getColor(R.color.gray4, null);
-
-        float x;
-        float y;
-        float w = (float) mWidth / COLS;
-        float h = (float) mHeight / (ROWS + 1);
         int id = 0;
         for (int row = 0; row < ROWS; row++) {
-            y = h * row;
             for (int col = 0; col < COLS; col++) {
-                x = w * col;
                 SoftKey softKey = mSoftKeys.get(id);
-                softKey.setPos(x, y, w, h);
-                softKey.setColor(foregoundColor, backgroundColor);
                 if (mShiftSingleFlag || mShiftLockFlag) {
                     softKey.setCharacter(charHalfShift[id]);
                 } else {
@@ -175,13 +89,6 @@ public class QwertyView extends View {
                 id++;
             }
         }
-
-        y = h * ROWS;
-        w = (float) mWidth / 8;
-        backgroundColor = getResources().getColor(R.color.gray3, null);
-
-        mShiftKey.setPos(w * 0, y, w, h);
-        mShiftKey.setColor(foregoundColor, backgroundColor);
         mShiftKey.setDrawable(mShiftNoneDrawable);
         if (mShiftLockFlag) {
             mShiftKey.setDrawable(mShiftLockDrawable);
@@ -189,33 +96,15 @@ public class QwertyView extends View {
         if (mShiftSingleFlag) {
             mShiftKey.setDrawable(mShiftSingleDrawable);
         }
-
-        mSpaceKey.setPos(w * 1, y, w * 3, h);
-        mSpaceKey.setColor(foregoundColor, backgroundColor);
-        mSpaceKey.setCharacter('⎵');   // u23B5
-
-        mCursorLeftKey.setPos(w * 4, y, w, h);
-        mCursorLeftKey.setColor(foregoundColor, backgroundColor);
-        mCursorLeftKey.setCharacter('◂');  // u25C2
-
-        mCursorRightKey.setPos(w * 5, y, w, h);
-        mCursorRightKey.setColor(foregoundColor, backgroundColor);
-        mCursorRightKey.setCharacter('▸'); // u25B8
-
-        mBackspaceKey.setPos(w * 6, y, w, h);
-        mBackspaceKey.setColor(foregoundColor, backgroundColor);
-        mBackspaceKey.setCharacter('⌫');   // u232B
-
-        mEnterKey.setPos(w * 7, y, w, h);
-        mEnterKey.setColor(foregoundColor, backgroundColor);
-        mEnterKey.setCharacter('⏎');   // u23CE
-
         for (SoftKey softKey : mSoftKeys) {
             softKey.draw(mCanvas);
         }
+        mImageView.setImageBitmap(mBitmap);
+        invalidate();
     }
 
-    private void processSoftKey(@NonNull SoftKey softKey) {
+    @Override
+    public void processSoftKey(@NonNull SoftKey softKey) {
         int id = softKey.getId();
         if (id == SOFTKEY_ID_SHIFT) {
             if (mShiftLockFlag) {
@@ -231,31 +120,16 @@ public class QwertyView extends View {
             }
             return;
         }
-        switch (id) {
-            case SOFTKEY_ID_SPACE:
-                mSoftKeyboard.handleSpace();
-                break;
-            case SOFTKEY_ID_CURSOR_LEFT:
-                mSoftKeyboard.handleCursorLeft();
-                break;
-            case SOFTKEY_ID_CURSOR_RIGHT:
-                mSoftKeyboard.handleCursorRight();
-                break;
-            case SOFTKEY_ID_BACKSPACE:
-                mSoftKeyboard.handleBackspace();
-                break;
-            case SOFTKEY_ID_ENTER:
-                mSoftKeyboard.handleEnter();
-                break;
-            default:
-                if (mShiftSingleFlag || mShiftLockFlag) {
-                    mSoftKeyboard.handleCharacter(charHalfShift[id]);
-                } else {
-                    mSoftKeyboard.handleCharacter(charHalfNormal[id]);
-                }
-                break;
+        if (id >= 0) {
+            if (mShiftSingleFlag || mShiftLockFlag) {
+                mSoftKeyboard.handleCharacter(charHalfShift[id]);
+            } else {
+                mSoftKeyboard.handleCharacter(charHalfNormal[id]);
+            }
+            mShiftSingleFlag = false;
+            return;
         }
-        mShiftSingleFlag = false;
+        super.processSoftKey(softKey);
     }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -279,7 +153,7 @@ public class QwertyView extends View {
                 if (currentKey.isRepeatable()) {
                     // 押されたキーの初回リピート
                     mRepeatKey = currentKey;
-                    mRepeatHandler.postDelayed(mRepeatRunnable, repeatTimeout);
+                    mRepeatHandler.postDelayed(mRepeatRunnable, mRepeatTimeout);
                 }
                 currentKey.setPressed(true);
                 mLastKey = currentKey;
@@ -292,7 +166,7 @@ public class QwertyView extends View {
                 if (currentKey.isRepeatable()) {
                     // 移動した先のキーの初回リピート
                     mRepeatKey = currentKey;
-                    mRepeatHandler.postDelayed(mRepeatRunnable, repeatTimeout);
+                    mRepeatHandler.postDelayed(mRepeatRunnable, mRepeatTimeout);
                 }
                 if (mLastKey != null) {
                     mLastKey.setPressed(false);
@@ -317,17 +191,40 @@ public class QwertyView extends View {
     }
 
     @Override
-    protected void onDraw(@NonNull Canvas canvas) {
-        canvas.drawBitmap(mBitmap, 0, 0, null);
-    }
-
-    @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         super.onSizeChanged(w, h, oldw, oldh);
         mWidth = w;
         mHeight = h;
         mBitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
         mCanvas = new Canvas(mBitmap);
+        mImageView.setImageBitmap(mBitmap);
+
+        float kx;
+        float ky;
+        float kw = (float) mWidth / COLS;
+        float kh = (float) mHeight / (ROWS + 1);
+        int id = 0;
+        for (int row = 0; row < ROWS; row++) {
+            ky = kh * row;
+            for (int col = 0; col < COLS; col++) {
+                kx = kw * col;
+                SoftKey softKey = mSoftKeys.get(id);
+                softKey.setPos(kx, ky, kw, kh);
+                id++;
+            }
+        }
+
+        ky = kh * ROWS;
+        kw = (float) mWidth / 8;
+
+        mShiftKey.setPos(kw * 0, ky, kw, kh);
+        mSymbolViewKey.setPos(kw * 1, ky, kw, kh);
+        mSpaceKey.setPos(kw * 2, ky, kw * 2, kh);
+        mCursorLeftKey.setPos(kw * 4, ky, kw, kh);
+        mCursorRightKey.setPos(kw * 5, ky, kw, kh);
+        mBackspaceKey.setPos(kw * 6, ky, kw, kh);
+        mEnterKey.setPos(kw * 7, ky, kw, kh);
+
         drawKeyboard();
     }
 }

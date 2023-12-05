@@ -20,65 +20,42 @@ import android.annotation.SuppressLint;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
-import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.RectF;
-import android.graphics.drawable.Drawable;
 import android.util.AttributeSet;
 import android.util.DisplayMetrics;
 import android.view.MotionEvent;
-import android.view.View;
+import android.view.ViewGroup;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
 
-import androidx.core.content.res.ResourcesCompat;
-
-public class StrokeView extends View {
-    private final Context mContext;
-    private final SoftKeyboard mSoftKeyboard;
-    private final int mBackgroundColor;
-
-    private final Drawable mShiftSingleDrawable;
-    private final Drawable mShiftLockDrawable;
-
+public class StrokeView extends KeyboardLayout {
     private final Path mStrokePath;
     private final Paint mStrokePaint;
     private final Paint mFramePaint;
 
-    private float mDensity;
-    private int mWidth;
-    private int mHeight;
-
-    private boolean mShiftSingleFlag;
-    private boolean mShiftLockFlag;
     private boolean mPunctuationFlag;
-
-    private Bitmap mBitmap;
-    private Canvas mCanvas;
 
     public StrokeView(Context context, AttributeSet attrs) {
         super(context, attrs);
+        setOrientation(VERTICAL);
 
-        mContext = context;
-        mSoftKeyboard = (SoftKeyboard) context;
+        mImageView = new ImageView(context);
+        mImageView.setImageBitmap(mBitmap);
+        addView(mImageView, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1.0f));
 
-        mBackgroundColor = getResources().getColor(R.color.gray1, null);
-        mShiftSingleDrawable = ResourcesCompat.getDrawable(getResources(), R.drawable.ic_shift_single, null);
-        mShiftLockDrawable = ResourcesCompat.getDrawable(getResources(), R.drawable.ic_shift_lock, null);
-
-
-        mShiftSingleFlag = false;
-        mShiftLockFlag = false;
         mPunctuationFlag = false;
 
         mStrokePath = new Path();
         mStrokePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        mStrokePaint.setColor(getResources().getColor(R.color.white, null));
+        mStrokePaint.setColor(mKeyForegroundColor);
         mStrokePaint.setStrokeJoin(Paint.Join.ROUND);
         mStrokePaint.setStrokeWidth(mDensity * 3);
         mStrokePaint.setStyle(Paint.Style.STROKE);
 
         mFramePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        mFramePaint.setColor(getResources().getColor(R.color.white, null));
+        mFramePaint.setColor(mKeyForegroundColor);
         mFramePaint.setStrokeJoin(Paint.Join.ROUND);
         mFramePaint.setStrokeWidth(mDensity * 2);
         mFramePaint.setStyle(Paint.Style.STROKE);
@@ -115,16 +92,19 @@ public class StrokeView extends View {
             int bottom = (int) (cy + r);
             if (mShiftSingleFlag) {
                 mShiftSingleDrawable.setBounds(left, top, right, bottom);
-                mShiftSingleDrawable.setTint(Color.WHITE);
+                mShiftSingleDrawable.setTint(mKeyForegroundColor);
                 mShiftSingleDrawable.draw(mCanvas);
             }
             if (mShiftLockFlag) {
                 mShiftLockDrawable.setBounds(left, top, right, bottom);
-                mShiftLockDrawable.setTint(Color.WHITE);
+                mShiftLockDrawable.setTint(mKeyForegroundColor);
                 mShiftLockDrawable.draw(mCanvas);
             }
         }
         mCanvas.drawPath(mStrokePath, mStrokePaint);
+
+        mImageView.setImageBitmap(mBitmap);
+        invalidate();
     }
 
 
@@ -214,12 +194,6 @@ public class StrokeView extends View {
             case 'L':   // left
                 mSoftKeyboard.handleCursorLeft();
                 break;
-            case 'M':   // menu
-                break;
-            case 'N':   // nop
-                break;
-            case 'P':   // preference
-                break;
             case 'R':   // right
                 mSoftKeyboard.handleCursorRight();
                 break;
@@ -229,6 +203,9 @@ public class StrokeView extends View {
             case 'U':   // up
                 mSoftKeyboard.handleCursorUp();
                 break;
+            case 'M':   // menu
+            case 'N':   // nop
+            case 'P':   // preference
             default:
                 break;
         }
@@ -258,11 +235,6 @@ public class StrokeView extends View {
         drawKeyboard();
         invalidate();
         return true;
-    }
-
-    @Override
-    protected void onDraw(Canvas canvas) {
-        canvas.drawBitmap(mBitmap, 0, 0, null);
     }
 
     @Override

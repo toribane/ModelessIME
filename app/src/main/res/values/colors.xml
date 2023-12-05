@@ -16,4 +16,8 @@
     <color name="grayD">#FFDDDDDD</color>
     <color name="grayE">#FFEEEEEE</color>
     <color name="white">#FFFFFFFF</color>
+    <color name="background">#FF111111</color>
+    <color name="character_key_background">#FF333333</color>
+    <color name="function_key_background">#FF222222</color>
+    <color name="key_foreground">#FFFFFFFF</color>
 </resources>

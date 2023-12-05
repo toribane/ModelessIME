@@ -34,13 +34,15 @@ import androidx.preference.PreferenceManager;
 import java.util.ArrayList;
 
 public class SoftKeyboard extends InputMethodService {
-    private View mInputView;
-    private StrokeView mStrokeView;
-    private QwertyView mQwertyView;
-    private View mCandidateView;
-    private ViewGroup mCandidateLayout;
 
     private final StringBuilder mInputText = new StringBuilder();
+    private View mInputView;
+    private View mCandidateView;
+    private ViewGroup mCandidateLayout;
+    private StrokeView mStrokeView;
+    private QwertyView mQwertyView;
+    private SymbolView mSymbolView;
+    private String mKeyboardLayout;
     private String mLastCommit = "";
     private int mCandidateIndex = -1;
 
@@ -73,6 +75,7 @@ public class SoftKeyboard extends InputMethodService {
 
         mStrokeView = layout.findViewById(R.id.stroke_view);
         mQwertyView = layout.findViewById(R.id.qwerty_view);
+        mSymbolView = layout.findViewById(R.id.symbol_view);
 
         return mInputView;
     }
@@ -92,16 +95,18 @@ public class SoftKeyboard extends InputMethodService {
     public void onStartInputView(EditorInfo editorInfo, boolean restarting) {
         super.onStartInputView(editorInfo, restarting);
         SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
-        String mKeyboardLayout = sharedPreferences.getString("keyboard_layout", "qwerty");
+        mKeyboardLayout = sharedPreferences.getString("keyboard_layout", "qwerty");
         switch (mKeyboardLayout) {
             default:
             case "qwerty":
                 mQwertyView.setVisibility(View.VISIBLE);
                 mStrokeView.setVisibility(View.INVISIBLE);
+                mSymbolView.setVisibility(View.INVISIBLE);
                 break;
             case "stroke":
                 mQwertyView.setVisibility(View.INVISIBLE);
                 mStrokeView.setVisibility(View.VISIBLE);
+                mSymbolView.setVisibility(View.INVISIBLE);
                 break;
         }
         resetInput();
@@ -151,6 +156,23 @@ public class SoftKeyboard extends InputMethodService {
     /*
      * 各キー入力ハンドラ
      */
+    public void handleString(String s) {
+        if (mInputText.length() == 0) {
+            // 未入力
+        } else {
+            if (mCandidateIndex < 0) {
+                // 候補未選択
+            } else {
+                // 候補選択中→選択中の候補をコミット
+                icCommitCandidateText(mCandidateLayout.getChildAt(mCandidateIndex));
+            }
+        }
+        mInputText.append(s);
+        icSetComposingText(mInputText);
+        ArrayList<String> list = mDictionary.search(mInputText.toString(), 40);
+        buildCandidate(list);
+    }
+
     public void handleCharacter(char charCode) {
         if (mInputText.length() == 0) {
             // 未入力
@@ -278,11 +300,42 @@ public class SoftKeyboard extends InputMethodService {
             // 未入力
         } else {
             if (mCandidateIndex < 0) {
+                // 候補未選択→入力テキストをそのままコミット
+                icCommitInputText();
+            } else {
+                // 候補選択中→選択中の候補をコミット
+                icCommitCandidateText(mCandidateLayout.getChildAt(mCandidateIndex));
+            }
+        }
+        mQwertyView.setVisibility(View.INVISIBLE);
+        mStrokeView.setVisibility(View.INVISIBLE);
+        mSymbolView.setVisibility(View.VISIBLE);
+    }
+
+    public void handleKeyboard() {
+        if (mInputText.length() == 0) {
+            // 未入力
+        } else {
+            if (mCandidateIndex < 0) {
                 // 候補未選択
             } else {
                 // 候補選択中
             }
         }
+        switch (mKeyboardLayout) {
+            default:
+            case "qwerty":
+                mQwertyView.setVisibility(View.VISIBLE);
+                mStrokeView.setVisibility(View.INVISIBLE);
+                mSymbolView.setVisibility(View.INVISIBLE);
+                break;
+            case "stroke":
+                mQwertyView.setVisibility(View.INVISIBLE);
+                mStrokeView.setVisibility(View.VISIBLE);
+                mSymbolView.setVisibility(View.INVISIBLE);
+                break;
+        }
+        resetInput();
     }
 
     /*
@@ -302,6 +355,7 @@ public class SoftKeyboard extends InputMethodService {
             view.setPressed(false);
             mCandidateLayout.addView(view);
         }
+        mCandidateView.scrollTo(0, 0);
     }
 
     private void selectCandidate() {
@@ -327,10 +381,5 @@ public class SoftKeyboard extends InputMethodService {
                 view.setSelected(false);
             }
         }
-        if (mCandidateIndex < 0) {
-            // 未選択ならば先頭にスクロールする
-            mCandidateView.scrollTo(0, 0);
-        }
     }
-
 }
