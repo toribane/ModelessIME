@@ -41,46 +41,16 @@ import jdbm.helper.TupleBrowser;
 public class Dictionary {
 
     static String BTREE_NAME = "btree_dic";
+    private final ArrayList<BTree> dicList = new ArrayList<>();
+    private final Context mContext;
     private BTree mBTreeSystemDic;
     private RecordManager mRecmanLearningDic;
     private BTree mBTreeLearningDic;
     private RecordManager mRecmanPredictionDic;
     private BTree mBTreePredictionDic;
-    private final ArrayList<BTree> dicList = new ArrayList<>();
-
-    private void extractZip(@NonNull Context context, String zipFileName) {
-        try {
-            InputStream is = context.getAssets().open(zipFileName);
-            ZipInputStream zis = new ZipInputStream(new BufferedInputStream(is));
-            ZipEntry ze;
-            while ((ze = zis.getNextEntry()) != null) {
-                String fn = context.getFilesDir().getAbsolutePath() + "/" + ze.getName();
-                File f = new File(fn);
-                boolean skip = true;
-                if (f.exists()) {
-                    if (f.length() != ze.getSize()) {
-                        skip = false;
-                    }
-                } else {
-                    skip = false;
-                }
-                if (skip) {
-                    continue;
-                }
-                BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(fn));
-                byte[] buf = new byte[16 * 1024];
-                int size;
-                while ((size = zis.read(buf, 0, buf.length)) > 0) {
-                    bos.write(buf, 0, size);
-                }
-                bos.flush();
-                bos.close();
-            }
-        } catch (IOException ignored) {
-        }
-    }
 
     public Dictionary(Context context) {
+        mContext = context;
         extractZip(context, "system_dic.zip");
 
         // 予測辞書
@@ -130,6 +100,38 @@ public class Dictionary {
             dicList.add(mBTreeSystemDic);
         } catch (IOException e) {
             mBTreeSystemDic = null;
+        }
+    }
+
+    private void extractZip(@NonNull Context context, String zipFileName) {
+        try {
+            InputStream is = context.getAssets().open(zipFileName);
+            ZipInputStream zis = new ZipInputStream(new BufferedInputStream(is));
+            ZipEntry ze;
+            while ((ze = zis.getNextEntry()) != null) {
+                String fn = context.getFilesDir().getAbsolutePath() + "/" + ze.getName();
+                File f = new File(fn);
+                boolean skip = true;
+                if (f.exists()) {
+                    if (f.length() != ze.getSize()) {
+                        skip = false;
+                    }
+                } else {
+                    skip = false;
+                }
+                if (skip) {
+                    continue;
+                }
+                BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(fn));
+                byte[] buf = new byte[16 * 1024];
+                int size;
+                while ((size = zis.read(buf, 0, buf.length)) > 0) {
+                    bos.write(buf, 0, size);
+                }
+                bos.flush();
+                bos.close();
+            }
+        } catch (IOException ignored) {
         }
     }
 
@@ -248,4 +250,47 @@ public class Dictionary {
     public void addPrediction(String keyword, String word) {
         add(keyword, word, mRecmanPredictionDic, mBTreePredictionDic);
     }
+
+    private void importDictionary(String entry, RecordManager recman, BTree btree) {
+        String[] ss = entry.split("\t");
+        if (ss.length < 2) {
+            return;
+        }
+        String keyword = ss[0];
+        for (int i = 1; i < ss.length; i++) {
+            add(keyword, ss[i], recman, btree);
+        }
+    }
+
+    public void importLearning(String entry) {
+        importDictionary(entry, mRecmanLearningDic, mBTreeLearningDic);
+    }
+
+    public void importPrediction(String entry) {
+        importDictionary(entry, mRecmanPredictionDic, mBTreePredictionDic);
+    }
+
+    private ArrayList<String> exportDictionary(RecordManager recman, BTree btree) {
+        ArrayList<String> list = new ArrayList<>();
+        Tuple tuple = new Tuple();
+        try {
+            recman.commit();
+            TupleBrowser browser = btree.browse();
+            while (browser.getNext(tuple)) {
+                list.add(tuple.getKey() + "\t" + tuple.getValue());
+            }
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        return list;
+    }
+
+    public ArrayList<String> exportLearning() {
+        return exportDictionary(mRecmanLearningDic, mBTreeLearningDic);
+    }
+
+    public ArrayList<String> exportPrediction() {
+        return exportDictionary(mRecmanPredictionDic, mBTreePredictionDic);
+    }
+
 }

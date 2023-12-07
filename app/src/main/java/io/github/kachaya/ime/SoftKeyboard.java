@@ -149,8 +149,7 @@ public class SoftKeyboard extends InputMethodService {
         mDictionary.addPrediction(mLastCommit, word);
         mLastCommit = word;
         resetInput();
-        ArrayList<String> list = mDictionary.predict(word);
-        buildCandidate(list);
+        buildPredictCandidate(word);
     }
 
     /*
@@ -349,6 +348,24 @@ public class SoftKeyboard extends InputMethodService {
             TextView view = new TextView(new ContextThemeWrapper(this, style), null, style);
             String[] ss = list.get(i).split("\t");
             view.setTag(ss[0]);     // 確定時登録用テキスト
+            view.setText(ss[1]);    // 表示用テキスト
+            view.setOnClickListener(this::icCommitCandidateText);
+            view.setSelected(false);
+            view.setPressed(false);
+            mCandidateLayout.addView(view);
+        }
+        mCandidateView.scrollTo(0, 0);
+    }
+
+    private void buildPredictCandidate(String word) {
+        ArrayList<String> list = mDictionary.predict(word);
+        mCandidateIndex = -1;
+        mCandidateLayout.removeAllViewsInLayout();
+        int style = R.style.CandidateText;
+        for (int i = 0; i < list.size(); i++) {
+            TextView view = new TextView(new ContextThemeWrapper(this, style), null, style);
+            String[] ss = list.get(i).split("\t");
+            view.setTag("");        // 予測候補は学習辞書に登録しない
             view.setText(ss[1]);    // 表示用テキスト
             view.setOnClickListener(this::icCommitCandidateText);
             view.setSelected(false);
