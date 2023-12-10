@@ -41,7 +41,6 @@ import java.util.ArrayList;
 public class PredictionDictionaryTool extends AppCompatActivity {
     private final static String DEFAULT_FILENAME = "prediction_dic.txt";
     private Dictionary mDictionary;
-    private ArrayAdapter<String> mAdapter;
     ActivityResultLauncher<Intent> exportResultLauncher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(),
             result -> {
@@ -64,6 +63,7 @@ public class PredictionDictionaryTool extends AppCompatActivity {
                     }
                 }
             });
+    private ArrayAdapter<String> mAdapter;
     ActivityResultLauncher<Intent> importResultLauncher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(),
             result -> {
@@ -108,15 +108,6 @@ public class PredictionDictionaryTool extends AppCompatActivity {
         buildList();
     }
 
-    private void buildList() {
-        mAdapter.clear();
-        ArrayList<String> entryList = mDictionary.exportPrediction();
-        for (String entry : entryList) {
-            mAdapter.add(entry);
-        }
-        mAdapter.notifyDataSetChanged();
-    }
-
     private void exportDictionary(View v) {
         Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
@@ -131,5 +122,14 @@ public class PredictionDictionaryTool extends AppCompatActivity {
         intent.setType("text/plain");
         intent.putExtra(DocumentsContract.EXTRA_INITIAL_URI, DEFAULT_FILENAME);
         importResultLauncher.launch(intent);
+    }
+
+    private void buildList() {
+        mAdapter.clear();
+        ArrayList<String> entryList = mDictionary.exportPrediction();
+        for (String entry : entryList) {
+            mAdapter.add(entry);
+        }
+        mAdapter.notifyDataSetChanged();
     }
 }

@@ -41,7 +41,6 @@ import jdbm.helper.TupleBrowser;
 public class Dictionary {
 
     static String BTREE_NAME = "btree_dic";
-    private final ArrayList<BTree> dicList = new ArrayList<>();
     private final Context mContext;
     private BTree mBTreeSystemDic;
     private RecordManager mRecmanLearningDic;
@@ -71,7 +70,7 @@ public class Dictionary {
             mBTreePredictionDic = null;
         }
 
-        // 優先する辞書の順にdicListに追加する
+        // 学習辞書
         try {
             Properties props = new Properties();
             String name = context.getFilesDir().getAbsolutePath() + "/learning_dic";
@@ -84,20 +83,17 @@ public class Dictionary {
             } else {
                 mBTreeLearningDic = BTree.load(mRecmanLearningDic, recid);
             }
-
-            dicList.add(mBTreeLearningDic);
         } catch (IOException e) {
             mRecmanLearningDic = null;
             mBTreeLearningDic = null;
         }
+        // システム辞書
         try {
             Properties props = new Properties();
             String name = context.getFilesDir().getAbsolutePath() + "/system_dic";
             RecordManager recman = RecordManagerFactory.createRecordManager(name, props);
             long recid = recman.getNamedObject(BTREE_NAME);
             mBTreeSystemDic = BTree.load(recman, recid);
-
-            dicList.add(mBTreeSystemDic);
         } catch (IOException e) {
             mBTreeSystemDic = null;
         }
@@ -142,18 +138,86 @@ public class Dictionary {
         TupleBrowser browser;
         String pair;
         int num = 0;
-        for (BTree btree : dicList) {
+
+        ArrayList<String> keys = new ArrayList<>();
+        keys.add(hiragana);
+        char lastChar = Character.toLowerCase(hiragana.charAt(hiragana.length() - 1));
+        if ("bcdfghjklmnpqrstvwxyz".indexOf(lastChar) >= 0) {
+            keys.add(Converter.romajiToHiragana(keyword + "a"));
+            keys.add(Converter.romajiToHiragana(keyword + "i"));
+            keys.add(Converter.romajiToHiragana(keyword + "u"));
+            keys.add(Converter.romajiToHiragana(keyword + "e"));
+            keys.add(Converter.romajiToHiragana(keyword + "o"));
+            if (lastChar == 'n') {
+                keys.add(Converter.romajiToHiragana(keyword + "'"));
+            }
+        }
+        // 学習辞書の完全一致
+        for (String key : keys) {
             try {
-                browser = btree.browse(hiragana);
+                String value = (String) mBTreeLearningDic.find(key);
+                if (value != null) {
+                    String[] ss = value.split("\t");
+                    for (String s : ss) {
+                        pair = key + "\t" + s;
+                        if (list.contains(pair)) {
+                            continue;
+                        }
+                        list.add(pair);
+                    }
+                }
+            } catch (IOException ignored) {
+            }
+        }
+        // システム辞書の完全一致
+        for (String key : keys) {
+            try {
+                String value = (String) mBTreeSystemDic.find(key);
+                if (value != null) {
+                    String[] ss = value.split("\t");
+                    for (String s : ss) {
+                        pair = key + "\t" + s;
+                        if (list.contains(pair)) {
+                            continue;
+                        }
+                        list.add(pair);
+                    }
+                }
+            } catch (IOException ignored) {
+            }
+        }
+        // 直接変換
+        for (String key : keys) {
+            pair = key + "\t" + key;
+            if (!list.contains(pair)) {
+                list.add(pair);
+            }
+            pair = key + "\t" + Converter.toWideKatakana(key);
+            if (!list.contains(pair)) {
+                list.add(pair);
+            }
+            pair = key + "\t" + Converter.toHalfKatakana(key);
+            if (!list.contains(pair)) {
+                list.add(pair);
+            }
+        }
+        pair = keyword + "\t" + Converter.toWideLatin(keyword); // 元のアルファベットから
+        if (!list.contains(pair)) {
+            list.add(pair);
+        }
+        // システム辞書の曖昧検索、制限あり
+        for (String key : keys) {
+            try {
+                browser = mBTreeSystemDic.browse(key);
                 while (browser.getNext(tuple)) {
-                    String key = (String) tuple.getKey();
-                    if (!key.startsWith(hiragana)) {
+                    String tupleKey = (String) tuple.getKey();
+                    if (!tupleKey.startsWith(key)) {
                         break;
                     }
                     String value = (String) tuple.getValue();
                     String[] ss = value.split("\t");
                     for (String s : ss) {
-                        pair = key + "\t" + s;
+                        pair = tupleKey + "\t" + s;
                         if (list.contains(pair)) {
                             continue;
                         }
@@ -167,26 +231,13 @@ public class Dictionary {
                         break;
                     }
                 }
+                if (num > limit) {
+                    break;
+                }
             } catch (IOException ignored) {
             }
         }
 
-        pair = hiragana + "\t" + hiragana;
-        if (!list.contains(pair)) {
-            list.add(pair);
-        }
-        pair = hiragana + "\t" + Converter.toWideKatakana(hiragana);
-        if (!list.contains(pair)) {
-            list.add(pair);
-        }
-        pair = hiragana + "\t" + Converter.toHalfKatakana(hiragana);
-        if (!list.contains(pair)) {
-            list.add(pair);
-        }
-        pair = keyword + "\t" + Converter.toWideLatin(keyword);
-        if (!list.contains(pair)) {
-            list.add(pair);
-        }
         return list;
     }
 
@@ -213,6 +264,11 @@ public class Dictionary {
         } catch (IOException ignored) {
         }
         return list;
+    }
+
+    public void addLearning(String keyword, String word) {
+        String hiragana = Converter.romajiToHiragana(keyword);
+        add(hiragana, word, mRecmanLearningDic, mBTreeLearningDic);
     }
 
     private void add(String keyword, String word, RecordManager recman, BTree btree) {
@@ -242,13 +298,12 @@ public class Dictionary {
         }
     }
 
-    public void addLearning(String keyword, String word) {
-        String hiragana = Converter.romajiToHiragana(keyword);
-        add(hiragana, word, mRecmanLearningDic, mBTreeLearningDic);
-    }
-
     public void addPrediction(String keyword, String word) {
         add(keyword, word, mRecmanPredictionDic, mBTreePredictionDic);
+    }
+
+    public void importLearning(String entry) {
+        importDictionary(entry, mRecmanLearningDic, mBTreeLearningDic);
     }
 
     private void importDictionary(String entry, RecordManager recman, BTree btree) {
@@ -262,12 +317,12 @@ public class Dictionary {
         }
     }
 
-    public void importLearning(String entry) {
-        importDictionary(entry, mRecmanLearningDic, mBTreeLearningDic);
-    }
-
     public void importPrediction(String entry) {
         importDictionary(entry, mRecmanPredictionDic, mBTreePredictionDic);
+    }
+
+    public ArrayList<String> exportLearning() {
+        return exportDictionary(mRecmanLearningDic, mBTreeLearningDic);
     }
 
     private ArrayList<String> exportDictionary(RecordManager recman, BTree btree) {
@@ -283,10 +338,6 @@ public class Dictionary {
             throw new RuntimeException(e);
         }
         return list;
-    }
-
-    public ArrayList<String> exportLearning() {
-        return exportDictionary(mRecmanLearningDic, mBTreeLearningDic);
     }
 
     public ArrayList<String> exportPrediction() {

@@ -61,52 +61,31 @@ public class StrokeView extends KeyboardLayout {
         mFramePaint.setStyle(Paint.Style.STROKE);
     }
 
-    private void drawKeyboard() {
-
-        mCanvas.drawColor(mBackgroundColor);
-
-        float r = mDensity * 10.0f;
-        mFramePaint.setStyle(Paint.Style.STROKE);
-        mCanvas.drawRoundRect(mDensity, mDensity, mWidth - mDensity, mHeight - mDensity, r, r, mFramePaint);
-        mCanvas.drawLine(mWidth / 2.0f, mDensity, mWidth / 2.0f, mHeight - mDensity, mFramePaint);
-
-        mFramePaint.setStyle(Paint.Style.FILL_AND_STROKE);
-        mFramePaint.setTextSize(mHeight * 0.1f);
-        mFramePaint.setTextAlign(Paint.Align.CENTER);
-        float ofsX = mHeight * 0.07f;
-        float ofsY = mHeight * 0.08f + ((mFramePaint.descent() + mFramePaint.ascent()) / 2);
-        mCanvas.drawText("a", ofsX, mHeight - ofsY, mFramePaint);
-        mCanvas.drawText("1", mWidth - ofsX, mHeight - ofsY, mFramePaint);
-
-        mFramePaint.setStyle(Paint.Style.FILL_AND_STROKE);
-        float cx = mHeight * 0.1f;
-        float cy = mHeight * 0.1f;
-        r = mHeight * 0.05f;
-
-        if (mPunctuationFlag) {
-            mCanvas.drawCircle(cx, cy, r, mFramePaint);
-        } else {
-            int left = (int) (cx - r);
-            int top = (int) (cy - r);
-            int right = (int) (cx + r);
-            int bottom = (int) (cy + r);
-            if (mShiftSingleFlag) {
-                mShiftSingleDrawable.setBounds(left, top, right, bottom);
-                mShiftSingleDrawable.setTint(mKeyForegroundColor);
-                mShiftSingleDrawable.draw(mCanvas);
-            }
-            if (mShiftLockFlag) {
-                mShiftLockDrawable.setBounds(left, top, right, bottom);
-                mShiftLockDrawable.setTint(mKeyForegroundColor);
-                mShiftLockDrawable.draw(mCanvas);
-            }
+    @SuppressLint("ClickableViewAccessibility")
+    @Override
+    public boolean onTouchEvent(MotionEvent event) {
+        float x = event.getX();
+        float y = event.getY();
+        switch (event.getAction()) {
+            case MotionEvent.ACTION_DOWN:
+                mStrokePath.reset();
+                mStrokePath.moveTo(x, y);
+                break;
+            case MotionEvent.ACTION_MOVE:
+                mStrokePath.lineTo(x, y);
+                break;
+            case MotionEvent.ACTION_UP:
+                mStrokePath.lineTo(x, y);
+                processStroke();
+                mStrokePath.reset();
+                break;
+            default:
+                break;
         }
-        mCanvas.drawPath(mStrokePath, mStrokePaint);
-
-        mImageView.setImageBitmap(mBitmap);
+        drawKeyboard();
         invalidate();
+        return true;
     }
-
 
     private void processStroke() {
         char ch;
@@ -179,6 +158,52 @@ public class StrokeView extends KeyboardLayout {
         }
     }
 
+    private void drawKeyboard() {
+
+        mCanvas.drawColor(mBackgroundColor);
+
+        float r = mDensity * 10.0f;
+        mFramePaint.setStyle(Paint.Style.STROKE);
+        mCanvas.drawRoundRect(mDensity, mDensity, mWidth - mDensity, mHeight - mDensity, r, r, mFramePaint);
+        mCanvas.drawLine(mWidth / 2.0f, mDensity, mWidth / 2.0f, mHeight - mDensity, mFramePaint);
+
+        mFramePaint.setStyle(Paint.Style.FILL_AND_STROKE);
+        mFramePaint.setTextSize(mHeight * 0.1f);
+        mFramePaint.setTextAlign(Paint.Align.CENTER);
+        float ofsX = mHeight * 0.07f;
+        float ofsY = mHeight * 0.08f + ((mFramePaint.descent() + mFramePaint.ascent()) / 2);
+        mCanvas.drawText("a", ofsX, mHeight - ofsY, mFramePaint);
+        mCanvas.drawText("1", mWidth - ofsX, mHeight - ofsY, mFramePaint);
+
+        mFramePaint.setStyle(Paint.Style.FILL_AND_STROKE);
+        float cx = mHeight * 0.1f;
+        float cy = mHeight * 0.1f;
+        r = mHeight * 0.05f;
+
+        if (mPunctuationFlag) {
+            mCanvas.drawCircle(cx, cy, r, mFramePaint);
+        } else {
+            int left = (int) (cx - r);
+            int top = (int) (cy - r);
+            int right = (int) (cx + r);
+            int bottom = (int) (cy + r);
+            if (mShiftSingleFlag) {
+                mShiftSingleDrawable.setBounds(left, top, right, bottom);
+                mShiftSingleDrawable.setTint(mKeyForegroundColor);
+                mShiftSingleDrawable.draw(mCanvas);
+            }
+            if (mShiftLockFlag) {
+                mShiftLockDrawable.setBounds(left, top, right, bottom);
+                mShiftLockDrawable.setTint(mKeyForegroundColor);
+                mShiftLockDrawable.draw(mCanvas);
+            }
+        }
+        mCanvas.drawPath(mStrokePath, mStrokePaint);
+
+        mImageView.setImageBitmap(mBitmap);
+        invalidate();
+    }
+
     // CAPS以外、アルファベット数字共通
     private void processFunctionChar(char ch) {
         switch (ch) {
@@ -209,32 +234,6 @@ public class StrokeView extends KeyboardLayout {
             default:
                 break;
         }
-    }
-
-    @SuppressLint("ClickableViewAccessibility")
-    @Override
-    public boolean onTouchEvent(MotionEvent event) {
-        float x = event.getX();
-        float y = event.getY();
-        switch (event.getAction()) {
-            case MotionEvent.ACTION_DOWN:
-                mStrokePath.reset();
-                mStrokePath.moveTo(x, y);
-                break;
-            case MotionEvent.ACTION_MOVE:
-                mStrokePath.lineTo(x, y);
-                break;
-            case MotionEvent.ACTION_UP:
-                mStrokePath.lineTo(x, y);
-                processStroke();
-                mStrokePath.reset();
-                break;
-            default:
-                break;
-        }
-        drawKeyboard();
-        invalidate();
-        return true;
     }
 
     @Override

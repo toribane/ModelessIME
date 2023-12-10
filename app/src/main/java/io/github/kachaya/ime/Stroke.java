@@ -40,53 +40,6 @@ import java.util.ArrayList;
  */
 public class Stroke {
 
-    public PointF[] points;
-    public RectF bounds;
-
-    public static class Result {
-        public char a;
-        public char n;
-        public char p;
-        public double distance;
-        public int rotate;
-        public Stroke modelStroke;
-        public Stroke inputStroke;
-
-        public Result(char a, char n, char p, double distance, int rotate, Stroke modelStroke, Stroke inputStroke) {
-            this.a = a;
-            this.n = n;
-            this.p = p;
-            this.distance = distance;
-            this.rotate = rotate;
-            this.modelStroke = modelStroke;
-            this.inputStroke = inputStroke;
-        }
-    }
-
-    public static class Chars {
-        public char a;
-        public char n;
-        public char p;
-
-        public Chars(char a, char n, char p) {
-            this.a = a;
-            this.n = n;
-            this.p = p;
-        }
-    }
-
-    public static class Model {
-        public Chars[] chars;
-        public Path path;
-        public Stroke stroke;
-
-        public Model(Chars[] chars, String svg) {
-            this.chars = chars;
-            this.path = createPath(svg);
-            this.stroke = new Stroke(path);
-        }
-    }
-
     private static final ArrayList<Model> models = new ArrayList<Model>() {
         {
             // 縦横
@@ -366,6 +319,44 @@ public class Stroke {
             }, "m 2,3 4,-3 4,3 -6,9"));      // '?'
         }
     };
+    public PointF[] points;
+    public RectF bounds;
+
+    public Stroke(Path path) {
+        points = new PointF[96];
+        RectF rect = new RectF();
+
+        path.computeBounds(rect, true);
+        float xOrigin = rect.centerX();
+        float yOrigin = rect.centerY();
+        PathMeasure pm = new PathMeasure(path, false);
+        float pl = pm.getLength();
+        float[] pos = new float[2];
+        double dMax = -Double.MAX_VALUE;
+        for (int i = 0; i < points.length; i++) {
+            float distance = (pl * i) / (float) (points.length - 1);
+            pm.getPosTan(distance, pos, null);
+            float x = pos[0] - xOrigin;
+            float y = pos[1] - yOrigin;
+            points[i] = new PointF(x, y);
+            dMax = Math.max(dMax, Math.sqrt(x * x + y * y));
+        }
+
+        float xMin, xMax;
+        float yMin, yMax;
+        xMin = yMin = Float.MAX_VALUE;
+        xMax = yMax = -Float.MAX_VALUE;
+        float ratio = (float) (100.0f / dMax);
+        for (PointF point : points) {
+            point.x *= ratio;
+            point.y *= ratio;
+            xMin = Math.min(xMin, point.x);
+            yMin = Math.min(yMin, point.y);
+            xMax = Math.max(xMax, point.x);
+            yMax = Math.max(yMax, point.y);
+        }
+        bounds = new RectF(xMin, yMin, xMax, yMax);
+    }
 
     /*
      * 簡易SVG→Path変換
@@ -437,52 +428,6 @@ public class Stroke {
         return path;
     }
 
-    public Stroke(Path path) {
-        points = new PointF[96];
-        RectF rect = new RectF();
-
-        path.computeBounds(rect, true);
-        float xOrigin = rect.centerX();
-        float yOrigin = rect.centerY();
-        PathMeasure pm = new PathMeasure(path, false);
-        float pl = pm.getLength();
-        float[] pos = new float[2];
-        double dMax = -Double.MAX_VALUE;
-        for (int i = 0; i < points.length; i++) {
-            float distance = (pl * i) / (float) (points.length - 1);
-            pm.getPosTan(distance, pos, null);
-            float x = pos[0] - xOrigin;
-            float y = pos[1] - yOrigin;
-            points[i] = new PointF(x, y);
-            dMax = Math.max(dMax, Math.sqrt(x * x + y * y));
-        }
-
-        float xMin, xMax;
-        float yMin, yMax;
-        xMin = yMin = Float.MAX_VALUE;
-        xMax = yMax = -Float.MAX_VALUE;
-        float ratio = (float) (100.0f / dMax);
-        for (PointF point : points) {
-            point.x *= ratio;
-            point.y *= ratio;
-            xMin = Math.min(xMin, point.x);
-            yMin = Math.min(yMin, point.y);
-            xMax = Math.max(xMax, point.x);
-            yMax = Math.max(yMax, point.y);
-        }
-        bounds = new RectF(xMin, yMin, xMax, yMax);
-    }
-
-    private double distance(Stroke dest) {
-        double d = 0;
-        for (int i = 0; i < points.length; i++) {
-            float dx = dest.points[i].x - this.points[i].x;
-            float dy = dest.points[i].y - this.points[i].y;
-            d += Math.sqrt(dx * dx + dy * dy);
-        }
-        return d / points.length;
-    }
-
     public static Result recognize(Path path) {
         double bestDistance = Double.MAX_VALUE;
         Model bestModel = null;
@@ -523,5 +468,59 @@ public class Stroke {
         modelPath.transform(matrixRotate);
         Stroke modelStroke = new Stroke(modelPath);
         return new Result(a, n, p, bestDistance, bestRotate, modelStroke, inputStroke);
+    }
+
+    private double distance(Stroke dest) {
+        double d = 0;
+        for (int i = 0; i < points.length; i++) {
+            float dx = dest.points[i].x - this.points[i].x;
+            float dy = dest.points[i].y - this.points[i].y;
+            d += Math.sqrt(dx * dx + dy * dy);
+        }
+        return d / points.length;
+    }
+
+    public static class Result {
+        public char a;
+        public char n;
+        public char p;
+        public double distance;
+        public int rotate;
+        public Stroke modelStroke;
+        public Stroke inputStroke;
+
+        public Result(char a, char n, char p, double distance, int rotate, Stroke modelStroke, Stroke inputStroke) {
+            this.a = a;
+            this.n = n;
+            this.p = p;
+            this.distance = distance;
+            this.rotate = rotate;
+            this.modelStroke = modelStroke;
+            this.inputStroke = inputStroke;
+        }
+    }
+
+    public static class Chars {
+        public char a;
+        public char n;
+        public char p;
+
+        public Chars(char a, char n, char p) {
+            this.a = a;
+            this.n = n;
+            this.p = p;
+        }
+    }
+
+    public static class Model {
+        public Chars[] chars;
+        public Path path;
+        public Stroke stroke;
+
+        public Model(Chars[] chars, String svg) {
+            this.chars = chars;
+            this.path = createPath(svg);
+            this.stroke = new Stroke(path);
+        }
     }
 }

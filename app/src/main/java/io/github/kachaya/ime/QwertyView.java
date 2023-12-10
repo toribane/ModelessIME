@@ -72,66 +72,6 @@ public class QwertyView extends KeyboardLayout {
         mSoftKeys.add(mEnterKey);
     }
 
-    private void drawKeyboard() {
-        if (mCanvas == null) {
-            return;
-        }
-        mCanvas.drawColor(mBackgroundColor);
-        int id = 0;
-        for (int row = 0; row < ROWS; row++) {
-            for (int col = 0; col < COLS; col++) {
-                SoftKey softKey = mSoftKeys.get(id);
-                if (mShiftSingleFlag || mShiftLockFlag) {
-                    softKey.setCharacter(charHalfShift[id]);
-                } else {
-                    softKey.setCharacter(charHalfNormal[id]);
-                }
-                id++;
-            }
-        }
-        mShiftKey.setDrawable(mShiftNoneDrawable);
-        if (mShiftLockFlag) {
-            mShiftKey.setDrawable(mShiftLockDrawable);
-        }
-        if (mShiftSingleFlag) {
-            mShiftKey.setDrawable(mShiftSingleDrawable);
-        }
-        for (SoftKey softKey : mSoftKeys) {
-            softKey.draw(mCanvas);
-        }
-        mImageView.setImageBitmap(mBitmap);
-        invalidate();
-    }
-
-    @Override
-    public void processSoftKey(@NonNull SoftKey softKey) {
-        int id = softKey.getId();
-        if (id == SOFTKEY_ID_SHIFT) {
-            if (mShiftLockFlag) {
-                mShiftLockFlag = false;
-                mShiftSingleFlag = false;
-            } else {
-                if (mShiftSingleFlag) {
-                    mShiftLockFlag = true;
-                    mShiftSingleFlag = false;
-                } else {
-                    mShiftSingleFlag = true;
-                }
-            }
-            return;
-        }
-        if (id >= 0) {
-            if (mShiftSingleFlag || mShiftLockFlag) {
-                mSoftKeyboard.handleCharacter(charHalfShift[id]);
-            } else {
-                mSoftKeyboard.handleCharacter(charHalfNormal[id]);
-            }
-            mShiftSingleFlag = false;
-            return;
-        }
-        super.processSoftKey(softKey);
-    }
-
     @SuppressLint("ClickableViewAccessibility")
     @Override
     public boolean onTouchEvent(@NonNull MotionEvent event) {
@@ -188,6 +128,66 @@ public class QwertyView extends KeyboardLayout {
         drawKeyboard();
         invalidate();
         return true;
+    }
+
+    @Override
+    public void processSoftKey(@NonNull SoftKey softKey) {
+        int id = softKey.getId();
+        if (id == SOFTKEY_ID_SHIFT) {
+            if (mShiftLockFlag) {
+                mShiftLockFlag = false;
+                mShiftSingleFlag = false;
+            } else {
+                if (mShiftSingleFlag) {
+                    mShiftLockFlag = true;
+                    mShiftSingleFlag = false;
+                } else {
+                    mShiftSingleFlag = true;
+                }
+            }
+            return;
+        }
+        if (id >= 0) {
+            if (mShiftSingleFlag || mShiftLockFlag) {
+                mSoftKeyboard.handleCharacter(charHalfShift[id]);
+            } else {
+                mSoftKeyboard.handleCharacter(charHalfNormal[id]);
+            }
+            mShiftSingleFlag = false;
+            return;
+        }
+        super.processSoftKey(softKey);
+    }
+
+    private void drawKeyboard() {
+        if (mCanvas == null) {
+            return;
+        }
+        mCanvas.drawColor(mBackgroundColor);
+        int id = 0;
+        for (int row = 0; row < ROWS; row++) {
+            for (int col = 0; col < COLS; col++) {
+                SoftKey softKey = mSoftKeys.get(id);
+                if (mShiftSingleFlag || mShiftLockFlag) {
+                    softKey.setCharacter(charHalfShift[id]);
+                } else {
+                    softKey.setCharacter(charHalfNormal[id]);
+                }
+                id++;
+            }
+        }
+        mShiftKey.setDrawable(mShiftNoneDrawable);
+        if (mShiftLockFlag) {
+            mShiftKey.setDrawable(mShiftLockDrawable);
+        }
+        if (mShiftSingleFlag) {
+            mShiftKey.setDrawable(mShiftSingleDrawable);
+        }
+        for (SoftKey softKey : mSoftKeys) {
+            softKey.draw(mCanvas);
+        }
+        mImageView.setImageBitmap(mBitmap);
+        invalidate();
     }
 
     @Override

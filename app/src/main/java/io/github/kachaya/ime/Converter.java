@@ -246,6 +246,16 @@ public class Converter {
     }
 
     // 全角英数へ変換
+    @NonNull
+    public static String toWideLatin(@NonNull CharSequence cs) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < cs.length(); i++) {
+            sb.append(toWideLatin(cs.charAt(i)));
+        }
+        return sb.toString();
+    }
+
+    // 全角英数へ変換
     public static char toWideLatin(char ch) {
         if (ch == '\u0020') {
             return '\u3000';    // 全角スペース
@@ -259,12 +269,11 @@ public class Converter {
         return ch;
     }
 
-    // 全角英数へ変換
-    @NonNull
-    public static String toWideLatin(@NonNull CharSequence cs) {
+    // 全角カタカナへ変換
+    public static String toWideKatakana(CharSequence cs) {
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < cs.length(); i++) {
-            sb.append(toWideLatin(cs.charAt(i)));
+            sb.append(toWideKatakana(cs.charAt(i)));
         }
         return sb.toString();
     }
@@ -275,15 +284,6 @@ public class Converter {
             return (char) (ch - 'ぁ' + 'ァ');
         }
         return ch;
-    }
-
-    // 全角カタカナへ変換
-    public static String toWideKatakana(CharSequence cs) {
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < cs.length(); i++) {
-            sb.append(toWideKatakana(cs.charAt(i)));
-        }
-        return sb.toString();
     }
 
     // 半角カタカナへ変換

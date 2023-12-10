@@ -80,27 +80,6 @@ public class SoftKey {
         return mRect.contains(x, y);
     }
 
-    private void drawCharacterKey(@NonNull Canvas canvas) {
-        String text = Character.toString(mCharacter);
-        mPaintText.setColor(mForegroundColor);
-        mPaintText.setTextSize(mRect.height() * 0.5f);
-        Paint.FontMetrics fontMetrics = mPaintText.getFontMetrics();
-        float x = mRect.centerX() - (mPaintText.measureText(text) / 2.0f);
-        float y = mRect.centerY() - ((fontMetrics.ascent + fontMetrics.descent) / 2.0f);
-        canvas.drawText(text, x, y, mPaintText);
-    }
-
-    private void drawDrawableKey(Canvas canvas) {
-        int r = (int) (mRect.height() / 4.0);
-        int left = (int) mRect.centerX() - r;
-        int top = (int) mRect.centerY() - r;
-        int right = (int) mRect.centerX() + r;
-        int bottom = (int) mRect.centerY() + r;
-        mDrawable.setBounds(left, top, right, bottom);
-        mDrawable.setTint(mForegroundColor);
-        mDrawable.draw(canvas);
-    }
-
     public void draw(Canvas canvas) {
         if (mPressed) {
             mPaintBackground.setColor(Color.GRAY);
@@ -117,5 +96,26 @@ public class SoftKey {
         if (mCharacter > ' ') {
             drawCharacterKey(canvas);
         }
+    }
+
+    private void drawDrawableKey(Canvas canvas) {
+        int r = (int) (mRect.height() / 4.0);
+        int left = (int) mRect.centerX() - r;
+        int top = (int) mRect.centerY() - r;
+        int right = (int) mRect.centerX() + r;
+        int bottom = (int) mRect.centerY() + r;
+        mDrawable.setBounds(left, top, right, bottom);
+        mDrawable.setTint(mForegroundColor);
+        mDrawable.draw(canvas);
+    }
+
+    private void drawCharacterKey(@NonNull Canvas canvas) {
+        String text = Character.toString(mCharacter);
+        mPaintText.setColor(mForegroundColor);
+        mPaintText.setTextSize(mRect.height() * 0.5f);
+        Paint.FontMetrics fontMetrics = mPaintText.getFontMetrics();
+        float x = mRect.centerX() - (mPaintText.measureText(text) / 2.0f);
+        float y = mRect.centerY() - ((fontMetrics.ascent + fontMetrics.descent) / 2.0f);
+        canvas.drawText(text, x, y, mPaintText);
     }
 }

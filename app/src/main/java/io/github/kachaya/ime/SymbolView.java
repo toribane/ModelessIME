@@ -108,36 +108,6 @@ public class SymbolView extends KeyboardLayout {
         return list;
     }
 
-    private void drawKeyboard() {
-        if (mCanvas == null) {
-            return;
-        }
-        mCanvas.drawColor(mBackgroundColor);
-        for (SoftKey softKey : mSoftKeys) {
-            softKey.draw(mCanvas);
-        }
-        mImageView.setImageBitmap(mBitmap);
-        invalidate();
-    }
-
-    @Override
-    public void processSoftKey(@NonNull SoftKey softKey) {
-        int id = softKey.getId();
-        if (id == SOFTKEY_ID_SYMBOL) {
-            if (mSymbolType == SYMBOL_TYPE_EMOJI) {
-                mSymbolType = SYMBOL_TYPE_KIGOU;
-                mSymbolKey.setDrawable(mSymbolEmojiDrawable);
-                mFlexListViewAdapter.setData(mKigouList);
-            } else {
-                mSymbolType = SYMBOL_TYPE_EMOJI;
-                mSymbolKey.setDrawable(mSymbolKigouDrawable);
-                mFlexListViewAdapter.setData(mEmojiList);
-            }
-            return;
-        }
-        super.processSoftKey(softKey);
-    }
-
     @SuppressLint("ClickableViewAccessibility")
     @Override
     public boolean onTouchEvent(@NonNull MotionEvent event) {
@@ -196,6 +166,36 @@ public class SymbolView extends KeyboardLayout {
     }
 
     @Override
+    public void processSoftKey(@NonNull SoftKey softKey) {
+        int id = softKey.getId();
+        if (id == SOFTKEY_ID_SYMBOL) {
+            if (mSymbolType == SYMBOL_TYPE_EMOJI) {
+                mSymbolType = SYMBOL_TYPE_KIGOU;
+                mSymbolKey.setDrawable(mSymbolEmojiDrawable);
+                mFlexListViewAdapter.setData(mKigouList);
+            } else {
+                mSymbolType = SYMBOL_TYPE_EMOJI;
+                mSymbolKey.setDrawable(mSymbolKigouDrawable);
+                mFlexListViewAdapter.setData(mEmojiList);
+            }
+            return;
+        }
+        super.processSoftKey(softKey);
+    }
+
+    private void drawKeyboard() {
+        if (mCanvas == null) {
+            return;
+        }
+        mCanvas.drawColor(mBackgroundColor);
+        for (SoftKey softKey : mSoftKeys) {
+            softKey.draw(mCanvas);
+        }
+        mImageView.setImageBitmap(mBitmap);
+        invalidate();
+    }
+
+    @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         super.onSizeChanged(w, h, oldw, oldh);
         mWidth = w;
@@ -248,11 +248,6 @@ public class SymbolView extends KeyboardLayout {
             notifyDataSetChanged();
         }
 
-        private void onClickListener(View view) {
-            TextView tv = (TextView) view;
-            mSoftKeyboard.handleString(tv.getText().toString());
-        }
-
         @NonNull
         @Override
         public FlexboxListViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
@@ -260,6 +255,11 @@ public class SymbolView extends KeyboardLayout {
                     .inflate(R.layout.viewholder_text, parent, false);
             view.setOnClickListener(this::onClickListener);
             return new FlexboxListViewHolder(view);
+        }
+
+        private void onClickListener(View view) {
+            TextView tv = (TextView) view;
+            mSoftKeyboard.handleString(tv.getText().toString());
         }
 
         @Override

@@ -118,13 +118,6 @@ public class SoftKeyboard extends InputMethodService {
         mCandidateIndex = -1;
     }
 
-    private void icSetComposingText(CharSequence cs) {
-        InputConnection ic = getCurrentInputConnection();
-        if (ic != null) {
-            ic.setComposingText(cs, 1);
-        }
-    }
-
     // 候補未選択でEnterによる確定
     private void icCommitInputText() {
         String word = mInputText.toString();
@@ -202,6 +195,38 @@ public class SoftKeyboard extends InputMethodService {
                 mCandidateIndex = (mCandidateIndex + 1) % mCandidateLayout.getChildCount();
             }
             selectCandidate();
+        }
+    }
+
+    private void selectCandidate() {
+        TextView view;
+        int cX = mCandidateView.getScrollX();
+        int cW = mCandidateView.getWidth();
+        for (int i = 0; i < mCandidateLayout.getChildCount(); i++) {
+            view = (TextView) mCandidateLayout.getChildAt(i);
+            if (i == mCandidateIndex) {
+                // 見える場所にスクロールする
+                int bT = view.getTop();
+                int bL = view.getLeft();
+                int bR = view.getRight();
+                if (bL < cX) {
+                    mCandidateView.scrollTo(bL, bT);
+                }
+                if (bR > (cX + cW)) {
+                    mCandidateView.scrollTo(bR - cW, bT);
+                }
+                view.setSelected(true);
+                icSetComposingText(view.getText());
+            } else {
+                view.setSelected(false);
+            }
+        }
+    }
+
+    private void icSetComposingText(CharSequence cs) {
+        InputConnection ic = getCurrentInputConnection();
+        if (ic != null) {
+            ic.setComposingText(cs, 1);
         }
     }
 
@@ -373,30 +398,5 @@ public class SoftKeyboard extends InputMethodService {
             mCandidateLayout.addView(view);
         }
         mCandidateView.scrollTo(0, 0);
-    }
-
-    private void selectCandidate() {
-        TextView view;
-        int cX = mCandidateView.getScrollX();
-        int cW = mCandidateView.getWidth();
-        for (int i = 0; i < mCandidateLayout.getChildCount(); i++) {
-            view = (TextView) mCandidateLayout.getChildAt(i);
-            if (i == mCandidateIndex) {
-                // 見える場所にスクロールする
-                int bT = view.getTop();
-                int bL = view.getLeft();
-                int bR = view.getRight();
-                if (bL < cX) {
-                    mCandidateView.scrollTo(bL, bT);
-                }
-                if (bR > (cX + cW)) {
-                    mCandidateView.scrollTo(bR - cW, bT);
-                }
-                view.setSelected(true);
-                icSetComposingText(view.getText());
-            } else {
-                view.setSelected(false);
-            }
-        }
     }
 }
