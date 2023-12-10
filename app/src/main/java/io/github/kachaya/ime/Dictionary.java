@@ -141,17 +141,6 @@ public class Dictionary {
 
         ArrayList<String> keys = new ArrayList<>();
         keys.add(hiragana);
-        char lastChar = Character.toLowerCase(hiragana.charAt(hiragana.length() - 1));
-        if ("bcdfghjklmnpqrstvwxyz".indexOf(lastChar) >= 0) {
-            keys.add(Converter.romajiToHiragana(keyword + "a"));
-            keys.add(Converter.romajiToHiragana(keyword + "i"));
-            keys.add(Converter.romajiToHiragana(keyword + "u"));
-            keys.add(Converter.romajiToHiragana(keyword + "e"));
-            keys.add(Converter.romajiToHiragana(keyword + "o"));
-            if (lastChar == 'n') {
-                keys.add(Converter.romajiToHiragana(keyword + "'"));
-            }
-        }
         // 学習辞書の完全一致
         for (String key : keys) {
             try {
@@ -206,6 +195,17 @@ public class Dictionary {
             list.add(pair);
         }
         // システム辞書の曖昧検索、制限あり
+        char lastChar = Character.toLowerCase(hiragana.charAt(hiragana.length() - 1));
+        if ("bcdfghjklmnpqrstvwxyz".indexOf(lastChar) >= 0) {
+            keys.add(Converter.romajiToHiragana(keyword + "a"));
+            keys.add(Converter.romajiToHiragana(keyword + "i"));
+            keys.add(Converter.romajiToHiragana(keyword + "u"));
+            keys.add(Converter.romajiToHiragana(keyword + "e"));
+            keys.add(Converter.romajiToHiragana(keyword + "o"));
+            if (lastChar == 'n') {
+                keys.add(Converter.romajiToHiragana(keyword + "'"));
+            }
+        }
         for (String key : keys) {
             try {
                 browser = mBTreeSystemDic.browse(key);
