@@ -18,18 +18,15 @@ package io.github.kachaya.ime;
 
 import android.content.Context;
 
-import androidx.annotation.NonNull;
-
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Properties;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipInputStream;
 
 import jdbm.RecordManager;
 import jdbm.RecordManagerFactory;
@@ -50,7 +47,7 @@ public class Dictionary {
 
     public Dictionary(Context context) {
         mContext = context;
-        extractZip(context, "system_dic.zip");
+        copyFromResRaw(context);
 
         // 予測辞書
         try {
@@ -99,35 +96,35 @@ public class Dictionary {
         }
     }
 
-    private void extractZip(@NonNull Context context, String zipFileName) {
+    private void copyFromResRaw(Context context) {
+        final int BUFSIZE = 1024 * 1024;
+
+        String filesDir = context.getFilesDir().getAbsolutePath();
+        String dbFileName = filesDir + "/system_dic.db";
+        File dbFile = new File(dbFileName);
+        long dbFileLength = dbFile.length();
+
+        InputStream is = context.getResources().openRawResource(R.raw.system_dic);
+
+        BufferedInputStream bis = new BufferedInputStream(is);
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        byte[] buf = new byte[BUFSIZE];
+
         try {
-            InputStream is = context.getAssets().open(zipFileName);
-            ZipInputStream zis = new ZipInputStream(new BufferedInputStream(is));
-            ZipEntry ze;
-            while ((ze = zis.getNextEntry()) != null) {
-                String fn = context.getFilesDir().getAbsolutePath() + "/" + ze.getName();
-                File f = new File(fn);
-                boolean skip = true;
-                if (f.exists()) {
-                    if (f.length() != ze.getSize()) {
-                        skip = false;
-                    }
-                } else {
-                    skip = false;
-                }
-                if (skip) {
-                    continue;
-                }
-                BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(fn));
-                byte[] buf = new byte[16 * 1024];
-                int size;
-                while ((size = zis.read(buf, 0, buf.length)) > 0) {
-                    bos.write(buf, 0, size);
-                }
+            int len;
+            while ((len = bis.read(buf, 0, BUFSIZE)) > 0) {
+                baos.write(buf, 0, len);
+            }
+            int size = baos.size();
+            if (size != dbFileLength) {
+                byte[] data = baos.toByteArray();
+                BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(dbFileName));
+                bos.write(data, 0, size);
                 bos.flush();
                 bos.close();
             }
-        } catch (IOException ignored) {
+        } catch (IOException e) {
+            throw new RuntimeException(e);
         }
     }
 
