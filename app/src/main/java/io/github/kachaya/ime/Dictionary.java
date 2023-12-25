@@ -263,11 +263,6 @@ public class Dictionary {
         return list;
     }
 
-    public void addLearning(String keyword, String word) {
-        String hiragana = Converter.romajiToHiragana(keyword);
-        add(hiragana, word, mRecmanLearningDic, mBTreeLearningDic);
-    }
-
     private void add(String keyword, String word, RecordManager recman, BTree btree) {
         if (recman == null || btree == null) {
             return;
@@ -295,31 +290,34 @@ public class Dictionary {
         }
     }
 
+    public void addLearning(String keyword, String word) {
+        String hiragana = Converter.romajiToHiragana(keyword);
+        add(hiragana, word, mRecmanLearningDic, mBTreeLearningDic);
+    }
+
     public void addPrediction(String keyword, String word) {
         add(keyword, word, mRecmanPredictionDic, mBTreePredictionDic);
     }
 
-    public void importLearning(String entry) {
-        importDictionary(entry, mRecmanLearningDic, mBTreeLearningDic);
-    }
-
-    private void importDictionary(String entry, RecordManager recman, BTree btree) {
-        String[] ss = entry.split("\t");
-        if (ss.length < 2) {
-            return;
-        }
-        String keyword = ss[0];
-        for (int i = 1; i < ss.length; i++) {
-            add(keyword, ss[i], recman, btree);
+    public void importDictionary(ArrayList<String> entries, RecordManager recman, BTree btree) {
+        for (String entry : entries) {
+            String[] ss = entry.split("\t");
+            if (ss.length < 2) {
+                continue;
+            }
+            String key = ss[0];
+            for (int i = 1; i < ss.length; i++) {
+                add(key, ss[i], recman, btree);
+            }
         }
     }
 
-    public void importPrediction(String entry) {
-        importDictionary(entry, mRecmanPredictionDic, mBTreePredictionDic);
+    public void importLearningDictionary(ArrayList<String> entries) {
+        importDictionary(entries, mRecmanLearningDic, mBTreeLearningDic);
     }
 
-    public ArrayList<String> exportLearning() {
-        return exportDictionary(mRecmanLearningDic, mBTreeLearningDic);
+    public void importPredictionDictionary(ArrayList<String> entries) {
+        importDictionary(entries, mRecmanPredictionDic, mBTreePredictionDic);
     }
 
     private ArrayList<String> exportDictionary(RecordManager recman, BTree btree) {
@@ -331,13 +329,16 @@ public class Dictionary {
             while (browser.getNext(tuple)) {
                 list.add(tuple.getKey() + "\t" + tuple.getValue());
             }
-        } catch (IOException e) {
-            throw new RuntimeException(e);
+        } catch (IOException ignored) {
         }
         return list;
     }
 
-    public ArrayList<String> exportPrediction() {
+    public ArrayList<String> exportLearningDictionary() {
+        return exportDictionary(mRecmanLearningDic, mBTreeLearningDic);
+    }
+
+    public ArrayList<String> exportPredictionDictionary() {
         return exportDictionary(mRecmanPredictionDic, mBTreePredictionDic);
     }
 
