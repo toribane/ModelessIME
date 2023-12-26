@@ -16,8 +16,10 @@
 
 package io.github.kachaya.ime;
 
+import android.content.Context;
 import android.content.SharedPreferences;
 import android.inputmethodservice.InputMethodService;
+import android.util.Log;
 import android.view.ContextThemeWrapper;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
@@ -28,14 +30,10 @@ import android.view.inputmethod.InputConnection;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
-import androidx.annotation.NonNull;
 import androidx.preference.PreferenceManager;
-
-import java.util.ArrayList;
 
 public class SoftKeyboard extends InputMethodService {
 
-    private final StringBuilder mInputText = new StringBuilder();
     private View mInputView;
     private View mCandidateView;
     private ViewGroup mCandidateLayout;
@@ -43,28 +41,21 @@ public class SoftKeyboard extends InputMethodService {
     private QwertyView mQwertyView;
     private SymbolView mSymbolView;
     private String mKeyboardLayout;
-    private String mLastCommit = "";
-    private int mCandidateIndex = -1;
 
+    private StringBuilder mInputText;
+    private boolean isPrediction;
+    private int mCandidateIndex;
     private Dictionary mDictionary;
+    private Candidate[] mCandidates;
+    private Candidate mLastCandidate;
 
     @Override
     public void onCreate() {
         super.onCreate();
         mDictionary = new Dictionary(this);
+        mInputText = new StringBuilder();
     }
 
-    /**
-     * Create and return the view hierarchy used for the input area (such as
-     * a soft keyboard).  This will be called once, when the input area is
-     * first displayed.  You can return null to have no input area; the default
-     * implementation returns null.
-     *
-     * <p>To control when the input view is displayed, implement
-     * {@link #onEvaluateInputViewShown()}.
-     * To change the input view after the first one is created by this
-     * function, use {@link #setInputView(View)}.
-     */
     @Override
     public View onCreateInputView() {
         LinearLayout layout = (LinearLayout) LayoutInflater.from(this).inflate(R.layout.input_layout, null);
@@ -80,17 +71,6 @@ public class SoftKeyboard extends InputMethodService {
         return mInputView;
     }
 
-    /**
-     * Called when the input view is being shown and input has started on
-     * a new editor.  This will always be called after {@link #onStartInput},
-     * allowing you to do your general setup there and just view-specific
-     * setup here.  You are guaranteed that {@link #onCreateInputView()} will
-     * have been called some time before this function is called.
-     *
-     * @param editorInfo Description of the type of text being edited.
-     * @param restarting Set to true if we are restarting input on the
-     *                   same text field as before.
-     */
     @Override
     public void onStartInputView(EditorInfo editorInfo, boolean restarting) {
         super.onStartInputView(editorInfo, restarting);
@@ -109,92 +89,246 @@ public class SoftKeyboard extends InputMethodService {
                 mSymbolView.setVisibility(View.INVISIBLE);
                 break;
         }
-        resetInput();
-    }
-
-    private void resetInput() {
         mInputText.setLength(0);
         mCandidateLayout.removeAllViewsInLayout();
         mCandidateIndex = -1;
     }
 
-    // 候補未選択でEnterによる確定
-    private void icCommitInputText() {
-        String word = mInputText.toString();
+    private void icSetComposingText(CharSequence cs) {
         InputConnection ic = getCurrentInputConnection();
         if (ic != null) {
-            ic.commitText(word, 1);
+            ic.setComposingText(cs, 1);
         }
-        resetInput();
     }
 
-    // 候補選択状態で確定
-    private void icCommitCandidateText(View v) {
-        TextView view = (TextView) v;
-        mCandidateIndex = mCandidateLayout.indexOfChild(view);
-        String keyword = (String) view.getTag();
-        String word = (String) view.getText();
+    private void icCommitText(CharSequence cs) {
         InputConnection ic = getCurrentInputConnection();
         if (ic != null) {
-            ic.commitText(word, 1);
+            ic.commitText(cs, 1);
         }
-        mDictionary.addLearning(keyword, word);
-        mDictionary.addPrediction(mLastCommit, word);
-        mLastCommit = word;
-        resetInput();
-        buildPredictCandidate(word);
     }
 
-    /*
-     * 各キー入力ハンドラ
+    // 入力中テキストをコミット
+    private void commitInputText() {
+        icCommitText(mInputText.toString());
+        mInputText.setLength(0);
+        mCandidateLayout.removeAllViewsInLayout();
+        mCandidateIndex = -1;
+    }
+
+    /**
+     * 選択中の候補をコミット
+     */
+    private void commitCandidateText() {
+        Candidate candidate = mCandidates[mCandidateIndex];
+        icCommitText(candidate.value);
+        mInputText.setLength(0);
+        mCandidateLayout.removeAllViewsInLayout();
+        mCandidateIndex = -1;
+
+        if (isPrediction) {
+            mDictionary.addPrediction(candidate.key, candidate.value);
+        } else {
+            mDictionary.addLearning(candidate.key, candidate.value);
+            if (mLastCandidate != null) {
+                mDictionary.addPrediction(mLastCandidate.value, candidate.value);
+                // 連接したものを学習
+                mDictionary.addConnection(mLastCandidate, candidate);
+            }
+        }
+        mLastCandidate = candidate;
+        buildPredictionCandidate();
+    }
+
+    /**
+     * 文字列キー処理
+     *
+     * @param s 文字列
      */
     public void handleString(String s) {
-        if (mInputText.length() == 0) {
-            // 未入力
-        } else {
-            if (mCandidateIndex < 0) {
-                // 候補未選択
-            } else {
-                // 候補選択中→選択中の候補をコミット
-                icCommitCandidateText(mCandidateLayout.getChildAt(mCandidateIndex));
-            }
+        if (mCandidateIndex >= 0) {
+            commitCandidateText();
         }
         mInputText.append(s);
         icSetComposingText(mInputText);
-        ArrayList<String> list = mDictionary.search(mInputText.toString(), 40);
-        buildCandidate(list);
+        buildConversionCandidate();
     }
 
-    public void handleCharacter(char charCode) {
+    /**
+     * 文字キー処理
+     *
+     * @param c 文字コード
+     */
+    public void handleCharacter(char c) {
+        if (mCandidateIndex >= 0) {
+            commitCandidateText();
+        }
+        mInputText.append(c);
+        icSetComposingText(mInputText);
+        buildConversionCandidate();
+    }
+
+    /**
+     * Enterキー処理
+     */
+    public void handleEnter() {
+        mLastCandidate = null;  // 続く入力を連接させない
         if (mInputText.length() == 0) {
             // 未入力
-        } else {
-            if (mCandidateIndex < 0) {
-                // 候補未選択
-            } else {
-                // 候補選択中→選択中の候補をコミット
-                icCommitCandidateText(mCandidateLayout.getChildAt(mCandidateIndex));
-            }
+            sendDownUpKeyEvents(KeyEvent.KEYCODE_ENTER);
+            return;
         }
-        mInputText.append(charCode);
-        icSetComposingText(mInputText);
-        ArrayList<String> list = mDictionary.search(mInputText.toString(), 40);
-        buildCandidate(list);
+        if (mCandidateIndex >= 0) {
+            // 候補選択中→選択中の候補をコミット
+            commitCandidateText();
+        } else {
+            // 候補未選択→入力テキストをそのままコミット
+            commitInputText();
+            icCommitText(mInputText);
+            mInputText.setLength(0);
+            mCandidateLayout.removeAllViewsInLayout();
+            mCandidateIndex = -1;
+        }
     }
 
+    /**
+     * スペースキー処理
+     */
     public void handleSpace() {
         if (mInputText.length() == 0) {
             // 未入力
             sendDownUpKeyEvents(KeyEvent.KEYCODE_SPACE);
-        } else {
-            if (mCandidateIndex < 0) {
-                // 候補未選択→最初の候補を選択状態にする
-                mCandidateIndex = 0;
-            } else {
-                // 候補選択中→次の候補を選択状態にする、最後に達したら先頭に戻る
-                mCandidateIndex = (mCandidateIndex + 1) % mCandidateLayout.getChildCount();
-            }
+            return;
+        }
+        mCandidateIndex = (mCandidateIndex + 1) % mCandidateLayout.getChildCount();
+        selectCandidate();
+    }
+
+    public void handleBackspace() {
+        if (mInputText.length() == 0) {
+            // 未入力
+            sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL);
+            return;
+        }
+        if (mCandidateIndex >= 0) {
+            // 候補選択中→候補未選択に戻す
+            mCandidateIndex = -1;
             selectCandidate();
+            return;
+        }
+        // 候補未選択→入力テキストの最後の文字を削除して候補を作り直す
+        mInputText.deleteCharAt(mInputText.length() - 1);
+        icSetComposingText(mInputText);
+        if (mInputText.length() == 0) {
+            buildPredictionCandidate();
+        } else {
+            buildConversionCandidate();
+        }
+        icSetComposingText(mInputText);
+    }
+
+    public void handleCursorLeft() {
+        if (mInputText.length() == 0) {
+            // 未入力
+            sendDownUpKeyEvents(KeyEvent.KEYCODE_DPAD_LEFT);
+        }
+    }
+
+    public void handleCursorRight() {
+        if (mInputText.length() == 0) {
+            // 未入力
+            sendDownUpKeyEvents(KeyEvent.KEYCODE_DPAD_RIGHT);
+        }
+    }
+
+    public void handleCursorUp() {
+        if (mInputText.length() == 0) {
+            // 未入力
+            sendDownUpKeyEvents(KeyEvent.KEYCODE_DPAD_UP);
+        }
+    }
+
+    public void handleCursorDown() {
+        if (mInputText.length() == 0) {
+            // 未入力
+            sendDownUpKeyEvents(KeyEvent.KEYCODE_DPAD_DOWN);
+        }
+    }
+
+    /**
+     * シンボルキーボードに切り替え
+     */
+    public void handleSymbol() {
+        if (mInputText.length() > 0) {
+            commitInputText();
+        }
+        mQwertyView.setVisibility(View.INVISIBLE);
+        mStrokeView.setVisibility(View.INVISIBLE);
+        mSymbolView.setVisibility(View.VISIBLE);
+    }
+
+    /**
+     * テキストキーボードに切り替え
+     */
+    public void handleKeyboard() {
+        if (mInputText.length() > 0) {
+            commitInputText();
+        }
+        switch (mKeyboardLayout) {
+            default:
+            case "qwerty":
+                mQwertyView.setVisibility(View.VISIBLE);
+                mStrokeView.setVisibility(View.INVISIBLE);
+                mSymbolView.setVisibility(View.INVISIBLE);
+                break;
+            case "stroke":
+                mQwertyView.setVisibility(View.INVISIBLE);
+                mStrokeView.setVisibility(View.VISIBLE);
+                mSymbolView.setVisibility(View.INVISIBLE);
+                break;
+        }
+    }
+
+    /**
+     * 現在入力中の文字列から変換候補を作り出す
+     */
+    private void buildConversionCandidate() {
+        isPrediction = false;
+        mCandidates = mDictionary.search(mInputText.toString());
+        setCandidateText();
+    }
+
+    /**
+     * 最後に確定した候補から予測候補を作り出す
+     */
+    private void buildPredictionCandidate() {
+        isPrediction = true;
+        mCandidates = mDictionary.predict(mLastCandidate.value);
+        setCandidateText();
+    }
+
+    private void onClickCandidateTextListener(View view) {
+        mCandidateIndex = mCandidateLayout.indexOfChild(view);
+        commitCandidateText();
+    }
+
+    /**
+     * 候補ビューに候補一覧を表示する
+     */
+    private void setCandidateText() {
+        mCandidateIndex = -1;
+        mCandidateLayout.removeAllViewsInLayout();
+        mCandidateView.scrollTo(0, 0);
+        if (mCandidates == null) {
+            return;
+        }
+        int style = R.style.CandidateText;
+        Context context = new ContextThemeWrapper(this, style);
+        for (Candidate candidate : mCandidates) {
+            TextView view = new TextView(context, null, style);
+            view.setText(candidate.value);    // 表示用テキスト
+            view.setOnClickListener(this::onClickCandidateTextListener);
+            mCandidateLayout.addView(view);
         }
     }
 
@@ -221,182 +355,5 @@ public class SoftKeyboard extends InputMethodService {
                 view.setSelected(false);
             }
         }
-    }
-
-    private void icSetComposingText(CharSequence cs) {
-        InputConnection ic = getCurrentInputConnection();
-        if (ic != null) {
-            ic.setComposingText(cs, 1);
-        }
-    }
-
-    public void handleBackspace() {
-        if (mInputText.length() == 0) {
-            // 未入力
-            sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL);
-        } else {
-            if (mCandidateIndex < 0) {
-                // 候補未選択→入力テキストの最後の文字を削除して候補を作り直す
-                mInputText.deleteCharAt(mInputText.length() - 1);
-                ArrayList<String> list;
-                if (mInputText.length() == 0) {
-                    list = mDictionary.predict(mLastCommit);
-                } else {
-                    list = mDictionary.search(mInputText.toString(), 50);
-                }
-                buildCandidate(list);
-            } else {
-                // 候補選択中→候補未選択に戻す
-                mCandidateIndex = -1;
-                selectCandidate();
-            }
-            icSetComposingText(mInputText);
-        }
-    }
-
-    public void handleEnter() {
-        if (mInputText.length() == 0) {
-            // 未入力
-            sendDownUpKeyEvents(KeyEvent.KEYCODE_ENTER);
-        } else {
-            if (mCandidateIndex < 0) {
-                // 候補未選択→入力テキストをそのままコミット
-                icCommitInputText();
-            } else {
-                // 候補選択中→選択中の候補をコミット
-                icCommitCandidateText(mCandidateLayout.getChildAt(mCandidateIndex));
-            }
-        }
-    }
-
-    public void handleCursorLeft() {
-        if (mInputText.length() == 0) {
-            // 未入力
-            sendDownUpKeyEvents(KeyEvent.KEYCODE_DPAD_LEFT);
-        } else {
-            if (mCandidateIndex < 0) {
-                // 候補未選択
-            } else {
-                // 候補選択中
-            }
-        }
-    }
-
-    public void handleCursorRight() {
-        if (mInputText.length() == 0) {
-            // 未入力
-            sendDownUpKeyEvents(KeyEvent.KEYCODE_DPAD_RIGHT);
-        } else {
-            if (mCandidateIndex < 0) {
-                // 候補未選択
-            } else {
-                // 候補選択中
-            }
-        }
-    }
-
-    public void handleCursorUp() {
-        if (mInputText.length() == 0) {
-            // 未入力
-        } else {
-            if (mCandidateIndex < 0) {
-                // 候補未選択
-            } else {
-                // 候補選択中
-            }
-        }
-    }
-
-    public void handleCursorDown() {
-        if (mInputText.length() == 0) {
-            // 未入力
-        } else {
-            if (mCandidateIndex < 0) {
-                // 候補未選択
-            } else {
-                // 候補選択中
-            }
-        }
-    }
-
-    public void handleSymbol() {
-        if (mInputText.length() == 0) {
-            // 未入力
-        } else {
-            if (mCandidateIndex < 0) {
-                // 候補未選択→入力テキストをそのままコミット
-                icCommitInputText();
-            } else {
-                // 候補選択中→選択中の候補をコミット
-                icCommitCandidateText(mCandidateLayout.getChildAt(mCandidateIndex));
-            }
-        }
-        mQwertyView.setVisibility(View.INVISIBLE);
-        mStrokeView.setVisibility(View.INVISIBLE);
-        mSymbolView.setVisibility(View.VISIBLE);
-    }
-
-    public void handleKeyboard() {
-        if (mInputText.length() == 0) {
-            // 未入力
-        } else {
-            if (mCandidateIndex < 0) {
-                // 候補未選択
-            } else {
-                // 候補選択中
-            }
-        }
-        switch (mKeyboardLayout) {
-            default:
-            case "qwerty":
-                mQwertyView.setVisibility(View.VISIBLE);
-                mStrokeView.setVisibility(View.INVISIBLE);
-                mSymbolView.setVisibility(View.INVISIBLE);
-                break;
-            case "stroke":
-                mQwertyView.setVisibility(View.INVISIBLE);
-                mStrokeView.setVisibility(View.VISIBLE);
-                mSymbolView.setVisibility(View.INVISIBLE);
-                break;
-        }
-        resetInput();
-    }
-
-    /*
-     * 候補
-     */
-    private void buildCandidate(@NonNull ArrayList<String> list) {
-        mCandidateIndex = -1;
-        mCandidateLayout.removeAllViewsInLayout();
-        int style = R.style.CandidateText;
-        for (int i = 0; i < list.size(); i++) {
-            TextView view = new TextView(new ContextThemeWrapper(this, style), null, style);
-            String[] ss = list.get(i).split("\t");
-            view.setTag(ss[0]);     // 確定時登録用テキスト
-            view.setText(ss[1]);    // 表示用テキスト
-            view.setOnClickListener(this::icCommitCandidateText);
-            view.setSelected(false);
-            view.setPressed(false);
-            mCandidateLayout.addView(view);
-        }
-        mCandidateView.scrollTo(0, 0);
-    }
-
-    private void buildPredictCandidate(String word) {
-        ArrayList<String> list = mDictionary.predict(word);
-        mCandidateIndex = -1;
-        mCandidateLayout.removeAllViewsInLayout();
-        int style = R.style.CandidateText;
-        for (int i = 0; i < list.size(); i++) {
-            TextView view = new TextView(new ContextThemeWrapper(this, style), null, style);
-            String[] ss = list.get(i).split("\t");
-            view.setTag("");        // 予測候補は学習辞書に登録しない
-            view.setText(ss[1]);    // 表示用テキスト
-            view.setOnClickListener(this::icCommitCandidateText);
-            view.setSelected(false);
-            view.setPressed(false);
-            mCandidateLayout.addView(view);
-        }
-        mCandidateView.scrollTo(0, 0);
     }
 }

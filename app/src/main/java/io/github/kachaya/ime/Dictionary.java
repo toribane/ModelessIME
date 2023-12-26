@@ -26,7 +26,9 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.Properties;
+import java.util.Set;
 
 import jdbm.RecordManager;
 import jdbm.RecordManagerFactory;
@@ -38,7 +40,6 @@ import jdbm.helper.TupleBrowser;
 public class Dictionary {
 
     static String BTREE_NAME = "btree_dic";
-    private final Context mContext;
     private BTree mBTreeSystemDic;
     private RecordManager mRecmanLearningDic;
     private BTree mBTreeLearningDic;
@@ -46,7 +47,6 @@ public class Dictionary {
     private BTree mBTreePredictionDic;
 
     public Dictionary(Context context) {
-        mContext = context;
         copyFromResRaw(context);
 
         // 予測辞書
@@ -128,139 +128,114 @@ public class Dictionary {
         }
     }
 
-    public ArrayList<String> search(String keyword, int limit) {
-        ArrayList<String> list = new ArrayList<>();
-        String hiragana = Converter.romajiToHiragana(keyword);
+    public Candidate[] search(String key) {
+        Set<String> set = new LinkedHashSet<>();
+        String hiragana = Converter.romajiToHiragana(key);
+        boolean hiraganaOnly = true;
+        for (char ch : hiragana.toCharArray()) {
+            if (ch < 0x80) {
+                hiraganaOnly = false;    // ローマ字ひらがな変換後にASCII文字が残っている
+                break;
+            }
+        }
         Tuple tuple = new Tuple();
         TupleBrowser browser;
-        String pair;
-        int num = 0;
-
-        ArrayList<String> keys = new ArrayList<>();
-        keys.add(hiragana);
-        // 学習辞書の完全一致
-        for (String key : keys) {
+        // 学習辞書
+        if (hiraganaOnly) {
             try {
-                String value = (String) mBTreeLearningDic.find(key);
-                if (value != null) {
-                    String[] ss = value.split("\t");
-                    for (String s : ss) {
-                        pair = key + "\t" + s;
-                        if (list.contains(pair)) {
-                            continue;
-                        }
-                        list.add(pair);
-                    }
-                }
-            } catch (IOException ignored) {
-            }
-        }
-        // システム辞書の完全一致
-        for (String key : keys) {
-            try {
-                String value = (String) mBTreeSystemDic.find(key);
-                if (value != null) {
-                    String[] ss = value.split("\t");
-                    for (String s : ss) {
-                        pair = key + "\t" + s;
-                        if (list.contains(pair)) {
-                            continue;
-                        }
-                        list.add(pair);
-                    }
-                }
-            } catch (IOException ignored) {
-            }
-        }
-        // 直接変換
-        for (String key : keys) {
-            pair = key + "\t" + key;
-            if (!list.contains(pair)) {
-                list.add(pair);
-            }
-            pair = key + "\t" + Converter.toWideKatakana(key);
-            if (!list.contains(pair)) {
-                list.add(pair);
-            }
-            pair = key + "\t" + Converter.toHalfKatakana(key);
-            if (!list.contains(pair)) {
-                list.add(pair);
-            }
-        }
-        pair = keyword + "\t" + Converter.toWideLatin(keyword); // 元のアルファベットから
-        if (!list.contains(pair)) {
-            list.add(pair);
-        }
-        // システム辞書の曖昧検索、制限あり
-        char lastChar = Character.toLowerCase(hiragana.charAt(hiragana.length() - 1));
-        if ("bcdfghjklmnpqrstvwxyz".indexOf(lastChar) >= 0) {
-            keys.add(Converter.romajiToHiragana(keyword + "a"));
-            keys.add(Converter.romajiToHiragana(keyword + "i"));
-            keys.add(Converter.romajiToHiragana(keyword + "u"));
-            keys.add(Converter.romajiToHiragana(keyword + "e"));
-            keys.add(Converter.romajiToHiragana(keyword + "o"));
-            if (lastChar == 'n') {
-                keys.add(Converter.romajiToHiragana(keyword + "'"));
-            }
-        }
-        for (String key : keys) {
-            try {
-                browser = mBTreeSystemDic.browse(key);
+                browser = mBTreeLearningDic.browse(hiragana);
                 while (browser.getNext(tuple)) {
                     String tupleKey = (String) tuple.getKey();
-                    if (!tupleKey.startsWith(key)) {
+                    if (!tupleKey.startsWith(hiragana)) {
                         break;
                     }
-                    String value = (String) tuple.getValue();
-                    String[] ss = value.split("\t");
-                    for (String s : ss) {
-                        pair = tupleKey + "\t" + s;
-                        if (list.contains(pair)) {
-                            continue;
-                        }
-                        list.add(pair);
+                    for (String candidate : ((String) tuple.getValue()).split("\t")) {
+                        set.add(tupleKey + "\t" + candidate);
+                    }
+                }
+            } catch (IOException ignored) {
+            }
+        }
+        try {
+            browser = mBTreeLearningDic.browse(key);
+            while (browser.getNext(tuple)) {
+                String tupleKey = (String) tuple.getKey();
+                if (!tupleKey.startsWith(key)) {
+                    break;
+                }
+                for (String candidate : ((String) tuple.getValue()).split("\t")) {
+                    set.add(tupleKey + "\t" + candidate);
+                }
+            }
+        } catch (IOException ignored) {
+        }
+        // システム辞書
+        if (hiraganaOnly) {
+            int limit = 50; // 不完全一致候補上限 TODO:設定項目にする
+            int num = 0;
+            try {
+                browser = mBTreeSystemDic.browse(hiragana);
+                while (browser.getNext(tuple)) {
+                    String tupleKey = (String) tuple.getKey();
+                    if (!tupleKey.startsWith(hiragana)) {
+                        break;
+                    }
+                    if (tupleKey.length() > hiragana.length() + 2) {
+                        break;  // 補完する文字数制限 TODO:設定項目にする
+                    }
+                    for (String candidate : ((String) tuple.getValue()).split("\t")) {
+                        set.add(tupleKey + "\t" + candidate);
                         num++;
-                        if (num > limit) {
-                            break;
-                        }
                     }
                     if (num > limit) {
                         break;
                     }
                 }
-                if (num > limit) {
-                    break;
-                }
             } catch (IOException ignored) {
             }
         }
+        // 辞書に無かったもの
+        if (hiraganaOnly) {
+            set.add(hiragana + "\t" + hiragana);
+            set.add(hiragana + "\t" + Converter.toWideKatakana(hiragana));
+            set.add(hiragana + "\t" + Converter.toHalfKatakana(hiragana));
+        }
+        set.add(key + "\t" + key);
+        set.add(key + "\t" + Converter.toWideLatin(key));
 
-        return list;
+        Candidate[] candidates = new Candidate[set.size()];
+        int i = 0;
+        for (String s : set) {
+            String[] ss = s.split("\t");
+            candidates[i++] = new Candidate(ss[0], ss[1]);
+        }
+        return candidates;
     }
 
-    public ArrayList<String> predict(String keyword) {
-        ArrayList<String> list = new ArrayList<>();
-        if (mRecmanPredictionDic == null || mBTreePredictionDic == null) {
-            return list;
+    public Candidate[] predict(String key) {
+        if (key == null) {
+            return null;
         }
-        if (keyword.length() == 0) {
-            return list;
-        }
+        Set<String> set = new LinkedHashSet<>();
         try {
-            String value = (String) mBTreePredictionDic.find(keyword);
+            String value = (String) mBTreePredictionDic.find(key);
             if (value != null) {
-                String[] ss = value.split("\t");
-                for (String s : ss) {
-                    String pair = keyword + "\t" + s;
-                    if (list.contains(pair)) {
-                        continue;
-                    }
-                    list.add(pair);
+                for (String s : value.split("\t")) {
+                    set.add(key + "\t" + s);
                 }
             }
         } catch (IOException ignored) {
         }
-        return list;
+        if (set.size() == 0) {
+            return null;
+        }
+        Candidate[] candidates = new Candidate[set.size()];
+        int i = 0;
+        for (String s : set) {
+            String[] ss = s.split("\t");
+            candidates[i++] = new Candidate(ss[0], ss[1]);
+        }
+        return candidates;
     }
 
     private void add(String keyword, String word, RecordManager recman, BTree btree) {
@@ -288,6 +263,16 @@ public class Dictionary {
             recman.commit();
         } catch (IOException ignored) {
         }
+    }
+
+    public void addConnection(Candidate left, Candidate right) {
+        String key = left.key + right.key;
+        String value = left.value + right.value;
+        if (value.matches(".*\\p{InCJK_SYMBOLS_AND_PUNCTUATION}.*")) {
+            // 句読点が含まれているなら連結しない
+            return;
+        }
+        addLearning(key, value);
     }
 
     public void addLearning(String keyword, String word) {
