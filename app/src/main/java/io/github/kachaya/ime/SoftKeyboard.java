@@ -19,7 +19,6 @@ package io.github.kachaya.ime;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.inputmethodservice.InputMethodService;
-import android.util.Log;
 import android.view.ContextThemeWrapper;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
@@ -303,7 +302,7 @@ public class SoftKeyboard extends InputMethodService {
      */
     private void buildPredictionCandidate() {
         isPrediction = true;
-        mCandidates = mDictionary.predict(mLastCandidate.value);
+        mCandidates = mDictionary.predict(mLastCandidate);
         setCandidateText();
     }
 

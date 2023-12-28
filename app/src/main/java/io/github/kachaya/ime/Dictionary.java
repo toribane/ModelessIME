@@ -17,6 +17,10 @@
 package io.github.kachaya.ime;
 
 import android.content.Context;
+import android.content.SharedPreferences;
+
+import androidx.annotation.Nullable;
+import androidx.preference.PreferenceManager;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
@@ -29,6 +33,8 @@ import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.Properties;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import jdbm.RecordManager;
 import jdbm.RecordManagerFactory;
@@ -37,16 +43,22 @@ import jdbm.helper.StringComparator;
 import jdbm.helper.Tuple;
 import jdbm.helper.TupleBrowser;
 
-public class Dictionary {
+public class Dictionary implements SharedPreferences.OnSharedPreferenceChangeListener {
 
-    static String BTREE_NAME = "btree_dic";
+    private static final Pattern punctuationPattern = Pattern.compile("[\\p{Punct}\\p{InCJK_SYMBOLS_AND_PUNCTUATION}]");
+    private static String BTREE_NAME = "btree_dic";
     private BTree mBTreeSystemDic;
     private RecordManager mRecmanLearningDic;
     private BTree mBTreeLearningDic;
     private RecordManager mRecmanPredictionDic;
     private BTree mBTreePredictionDic;
+    private boolean mConvertHalfkana;
 
     public Dictionary(Context context) {
+        SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(context);
+        sharedPreferences.registerOnSharedPreferenceChangeListener(this);
+        mConvertHalfkana = sharedPreferences.getBoolean("convert_halfkana", false);
+
         copyFromResRaw(context);
 
         // 予測辞書
@@ -93,6 +105,14 @@ public class Dictionary {
             mBTreeSystemDic = BTree.load(recman, recid);
         } catch (IOException e) {
             mBTreeSystemDic = null;
+        }
+    }
+
+    @Override
+    public void onSharedPreferenceChanged(SharedPreferences sharedPreferences, @Nullable String key) {
+//        Log.i("onSharedPreferenceChanged","key=" + key);
+        if (key.equals("convert_halfkana")) {
+            mConvertHalfkana = sharedPreferences.getBoolean(key, false);
         }
     }
 
@@ -198,7 +218,9 @@ public class Dictionary {
         if (hiraganaOnly) {
             set.add(hiragana + "\t" + hiragana);
             set.add(hiragana + "\t" + Converter.toWideKatakana(hiragana));
-            set.add(hiragana + "\t" + Converter.toHalfKatakana(hiragana));
+            if (mConvertHalfkana) {
+                set.add(hiragana + "\t" + Converter.toHalfKatakana(hiragana));
+            }
         }
         set.add(key + "\t" + key);
         set.add(key + "\t" + Converter.toWideLatin(key));
@@ -212,16 +234,23 @@ public class Dictionary {
         return candidates;
     }
 
-    public Candidate[] predict(String key) {
-        if (key == null) {
+    /**
+     * 最後に確定した候補から予測した候補を返す
+     *
+     * @param lastCandidate 最後に確定した候補
+     * @return
+     */
+    public Candidate[] predict(Candidate lastCandidate) {
+        if (lastCandidate == null) {
             return null;
         }
+        String lastValue = lastCandidate.value;
         Set<String> set = new LinkedHashSet<>();
         try {
-            String value = (String) mBTreePredictionDic.find(key);
+            String value = (String) mBTreePredictionDic.find(lastValue);
             if (value != null) {
                 for (String s : value.split("\t")) {
-                    set.add(key + "\t" + s);
+                    set.add(lastValue + "\t" + s);
                 }
             }
         } catch (IOException ignored) {
@@ -265,22 +294,42 @@ public class Dictionary {
         }
     }
 
+    /**
+     * 候補を連結して学習辞書に登録する
+     *
+     * @param left  左側候補
+     * @param right 右側候補
+     */
     public void addConnection(Candidate left, Candidate right) {
-        String key = left.key + right.key;
-        String value = left.value + right.value;
-        if (value.matches(".*\\p{InCJK_SYMBOLS_AND_PUNCTUATION}.*")) {
-            // 句読点が含まれているなら連結しない
+        if (left == null || right == null) {
             return;
         }
-        addLearning(key, value);
+        Matcher matcher;
+        matcher = punctuationPattern.matcher(left.value + right.value);
+        if (matcher.find()) {
+            // 句読点を含むなら連結登録しない
+            return;
+        }
+        if (!right.value.matches("^[ぁ-ゖー]+$")) {
+            // 右側がひらがな以外を含むなら連結登録しない（助詞や語尾の連結を想定）
+            return;
+        }
+        addLearning(left.key + right.key, left.value + right.value);
     }
 
     public void addLearning(String keyword, String word) {
-        String hiragana = Converter.romajiToHiragana(keyword);
-        add(hiragana, word, mRecmanLearningDic, mBTreeLearningDic);
+        add(keyword, word, mRecmanLearningDic, mBTreeLearningDic);
     }
 
     public void addPrediction(String keyword, String word) {
+        if (keyword == null || word == null) {
+            return;
+        }
+        Matcher matcher = punctuationPattern.matcher(keyword);
+        if (matcher.find()) {
+            // 直前の語句が句読点を含むなら登録しない
+            return;
+        }
         add(keyword, word, mRecmanPredictionDic, mBTreePredictionDic);
     }
 
@@ -326,5 +375,4 @@ public class Dictionary {
     public ArrayList<String> exportPredictionDictionary() {
         return exportDictionary(mRecmanPredictionDic, mBTreePredictionDic);
     }
-
 }
