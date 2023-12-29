@@ -172,6 +172,9 @@ public class Dictionary implements SharedPreferences.OnSharedPreferenceChangeLis
                 break;
             }
         }
+        if (hiraganaOnly) {
+            set.add(hiragana + "\t" + hiragana);
+        }
         Tuple tuple = new Tuple();
         TupleBrowser browser;
         // 学習辞書
@@ -230,7 +233,6 @@ public class Dictionary implements SharedPreferences.OnSharedPreferenceChangeLis
         }
         // 辞書に無かったもの
         if (hiraganaOnly) {
-            set.add(hiragana + "\t" + hiragana);
             set.add(hiragana + "\t" + Converter.toWideKatakana(hiragana));
             if (mConvertHalfkana) {
                 set.add(hiragana + "\t" + Converter.toHalfKatakana(hiragana));
@@ -314,6 +316,10 @@ public class Dictionary implements SharedPreferences.OnSharedPreferenceChangeLis
      */
     public void addConcatenation(Candidate left, Candidate right) {
         if (left == null || right == null) {
+            return;
+        }
+        if (left.key.length() < right.key.length()) {
+            // 左側が短かければ連結登録しない
             return;
         }
         Matcher matcher;
