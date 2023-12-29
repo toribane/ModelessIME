@@ -18,17 +18,17 @@ package io.github.kachaya.ime;
 
 import java.util.ArrayList;
 
-public class PredictionDictionaryTool extends DictionaryTool {
+public class ConnectionDictionaryTool extends DictionaryTool {
 
     public String getDefaultFileName() {
-        return "prediction_dic.txt";
+        return mDictionary.getConnectionDictionaryName() + ".txt";
     }
 
     public void importDictionary(ArrayList<String> entries) {
-        mDictionary.importPredictionDictionary(entries);
+        mDictionary.importConnectionDictionary(entries);
     }
 
     public ArrayList<String> exportDictionary() {
-        return mDictionary.exportPredictionDictionary();
+        return mDictionary.exportConnectionDictionary();
     }
 }

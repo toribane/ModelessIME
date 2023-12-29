@@ -91,6 +91,7 @@ public class SoftKeyboard extends InputMethodService {
         mInputText.setLength(0);
         mCandidateLayout.removeAllViewsInLayout();
         mCandidateIndex = -1;
+        mLastCandidate = null;
     }
 
     private void icSetComposingText(CharSequence cs) {
@@ -126,13 +127,17 @@ public class SoftKeyboard extends InputMethodService {
         mCandidateIndex = -1;
 
         if (isPrediction) {
-            mDictionary.addPrediction(candidate.key, candidate.value);
+            if (mLastCandidate != null) {
+                mDictionary.addConnection(mLastCandidate, candidate);
+                // 連接したものを学習
+                mDictionary.addConcatenation(mLastCandidate, candidate);
+            }
         } else {
             mDictionary.addLearning(candidate.key, candidate.value);
             if (mLastCandidate != null) {
-                mDictionary.addPrediction(mLastCandidate.value, candidate.value);
-                // 連接したものを学習
                 mDictionary.addConnection(mLastCandidate, candidate);
+                // 連接したものを学習
+                mDictionary.addConcatenation(mLastCandidate, candidate);
             }
         }
         mLastCandidate = candidate;
@@ -303,6 +308,9 @@ public class SoftKeyboard extends InputMethodService {
     private void buildPredictionCandidate() {
         isPrediction = true;
         mCandidates = mDictionary.predict(mLastCandidate);
+        if (mCandidates == null) {
+            return;
+        }
         setCandidateText();
     }
 

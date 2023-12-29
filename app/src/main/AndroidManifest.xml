@@ -38,8 +38,8 @@
             android:exported="false"
             android:label="学習辞書ツール" />
         <activity
-            android:name=".PredictionDictionaryTool"
+            android:name=".ConnectionDictionaryTool"
             android:exported="false"
-            android:label="予測辞書ツール" />
+            android:label="接続辞書ツール" />
     </application>
 </manifest>

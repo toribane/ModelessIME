@@ -40,11 +40,11 @@
         </Preference>
         <Preference
             app:iconSpaceReserved="false"
-            app:key="predictoin_dictionary_tool"
-            app:summary="予測辞書ツールを起動します"
-            app:title="予測辞書ツール">
+            app:key="connection_dictionary_tool"
+            app:summary="接続辞書ツールを起動します"
+            app:title="接続辞書ツール">
             <intent
-                android:targetClass="io.github.kachaya.ime.PredictionDictionaryTool"
+                android:targetClass="io.github.kachaya.ime.ConnectionDictionaryTool"
                 android:targetPackage="io.github.kachaya.ime" />
         </Preference>
     </PreferenceCategory>

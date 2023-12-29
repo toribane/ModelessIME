@@ -21,7 +21,7 @@ import java.util.ArrayList;
 public class LearningDictionaryTool extends DictionaryTool {
 
     public String getDefaultFileName() {
-        return "learning_dic.txt";
+        return mDictionary.getLearningDictionaryName() + ".txt";
     }
 
     public void importDictionary(ArrayList<String> entries) {

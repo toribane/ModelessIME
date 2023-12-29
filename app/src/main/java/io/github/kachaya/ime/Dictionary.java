@@ -30,6 +30,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.Properties;
 import java.util.Set;
@@ -46,12 +47,16 @@ import jdbm.helper.TupleBrowser;
 public class Dictionary implements SharedPreferences.OnSharedPreferenceChangeListener {
 
     private static final Pattern punctuationPattern = Pattern.compile("[\\p{Punct}\\p{InCJK_SYMBOLS_AND_PUNCTUATION}]");
-    private static String BTREE_NAME = "btree_dic";
+    private static final String BTREE_NAME = "btree_dic";
+    private static final String SYSTEM_DIC_NAME = "system_dic";
+    private static final String LEARNING_DIC_NAME = "learning_dic";
+    private static final String CONNECTION_DIC_NAME = "connection_dic";
     private BTree mBTreeSystemDic;
     private RecordManager mRecmanLearningDic;
     private BTree mBTreeLearningDic;
-    private RecordManager mRecmanPredictionDic;
-    private BTree mBTreePredictionDic;
+    private RecordManager mRecmanConnectionDic;
+    private BTree mBTreeConnectionDic;
+    // 設定項目
     private boolean mConvertHalfkana;
 
     public Dictionary(Context context) {
@@ -61,28 +66,27 @@ public class Dictionary implements SharedPreferences.OnSharedPreferenceChangeLis
 
         copyFromResRaw(context);
 
-        // 予測辞書
+        // 接続辞書
         try {
             Properties props = new Properties();
-            String name = context.getFilesDir().getAbsolutePath() + "/prediction_dic";
-            mRecmanPredictionDic = RecordManagerFactory.createRecordManager(name, props);
-            long recid = mRecmanPredictionDic.getNamedObject(BTREE_NAME);
+            String name = context.getFilesDir().getAbsolutePath() + "/" + CONNECTION_DIC_NAME;
+            mRecmanConnectionDic = RecordManagerFactory.createRecordManager(name, props);
+            long recid = mRecmanConnectionDic.getNamedObject(BTREE_NAME);
             if (recid == 0) {
-                mBTreePredictionDic = BTree.createInstance(mRecmanPredictionDic, new StringComparator());
-                mRecmanPredictionDic.setNamedObject(BTREE_NAME, mBTreePredictionDic.getRecid());
-                mRecmanPredictionDic.commit();
+                mBTreeConnectionDic = BTree.createInstance(mRecmanConnectionDic, new StringComparator());
+                mRecmanConnectionDic.setNamedObject(BTREE_NAME, mBTreeConnectionDic.getRecid());
+                mRecmanConnectionDic.commit();
             } else {
-                mBTreePredictionDic = BTree.load(mRecmanPredictionDic, recid);
+                mBTreeConnectionDic = BTree.load(mRecmanConnectionDic, recid);
             }
         } catch (IOException e) {
-            mRecmanPredictionDic = null;
-            mBTreePredictionDic = null;
+            mRecmanConnectionDic = null;
+            mBTreeConnectionDic = null;
         }
-
         // 学習辞書
         try {
             Properties props = new Properties();
-            String name = context.getFilesDir().getAbsolutePath() + "/learning_dic";
+            String name = context.getFilesDir().getAbsolutePath() + "/" + LEARNING_DIC_NAME;
             mRecmanLearningDic = RecordManagerFactory.createRecordManager(name, props);
             long recid = mRecmanLearningDic.getNamedObject(BTREE_NAME);
             if (recid == 0) {
@@ -99,7 +103,7 @@ public class Dictionary implements SharedPreferences.OnSharedPreferenceChangeLis
         // システム辞書
         try {
             Properties props = new Properties();
-            String name = context.getFilesDir().getAbsolutePath() + "/system_dic";
+            String name = context.getFilesDir().getAbsolutePath() + "/" + SYSTEM_DIC_NAME;
             RecordManager recman = RecordManagerFactory.createRecordManager(name, props);
             long recid = recman.getNamedObject(BTREE_NAME);
             mBTreeSystemDic = BTree.load(recman, recid);
@@ -108,9 +112,19 @@ public class Dictionary implements SharedPreferences.OnSharedPreferenceChangeLis
         }
     }
 
+    public String getLearningDictionaryName() {
+        return LEARNING_DIC_NAME;
+    }
+
+    public String getConnectionDictionaryName() {
+        return CONNECTION_DIC_NAME;
+    }
+
     @Override
     public void onSharedPreferenceChanged(SharedPreferences sharedPreferences, @Nullable String key) {
-//        Log.i("onSharedPreferenceChanged","key=" + key);
+        if (key == null) {
+            return;
+        }
         if (key.equals("convert_halfkana")) {
             mConvertHalfkana = sharedPreferences.getBoolean(key, false);
         }
@@ -120,7 +134,7 @@ public class Dictionary implements SharedPreferences.OnSharedPreferenceChangeLis
         final int BUFSIZE = 1024 * 1024;
 
         String filesDir = context.getFilesDir().getAbsolutePath();
-        String dbFileName = filesDir + "/system_dic.db";
+        String dbFileName = filesDir + "/" + SYSTEM_DIC_NAME + ".db";
         File dbFile = new File(dbFileName);
         long dbFileLength = dbFile.length();
 
@@ -238,20 +252,18 @@ public class Dictionary implements SharedPreferences.OnSharedPreferenceChangeLis
      * 最後に確定した候補から予測した候補を返す
      *
      * @param lastCandidate 最後に確定した候補
-     * @return
+     * @return 予測した候補
      */
     public Candidate[] predict(Candidate lastCandidate) {
         if (lastCandidate == null) {
             return null;
         }
-        String lastValue = lastCandidate.value;
+        String key = lastCandidate.key + " " + lastCandidate.value;
         Set<String> set = new LinkedHashSet<>();
         try {
-            String value = (String) mBTreePredictionDic.find(lastValue);
+            String value = (String) mBTreeConnectionDic.find(key);
             if (value != null) {
-                for (String s : value.split("\t")) {
-                    set.add(lastValue + "\t" + s);
-                }
+                set.addAll(Arrays.asList(value.split("\t")));
             }
         } catch (IOException ignored) {
         }
@@ -261,7 +273,7 @@ public class Dictionary implements SharedPreferences.OnSharedPreferenceChangeLis
         Candidate[] candidates = new Candidate[set.size()];
         int i = 0;
         for (String s : set) {
-            String[] ss = s.split("\t");
+            String[] ss = s.split(" ");
             candidates[i++] = new Candidate(ss[0], ss[1]);
         }
         return candidates;
@@ -300,7 +312,7 @@ public class Dictionary implements SharedPreferences.OnSharedPreferenceChangeLis
      * @param left  左側候補
      * @param right 右側候補
      */
-    public void addConnection(Candidate left, Candidate right) {
+    public void addConcatenation(Candidate left, Candidate right) {
         if (left == null || right == null) {
             return;
         }
@@ -321,16 +333,18 @@ public class Dictionary implements SharedPreferences.OnSharedPreferenceChangeLis
         add(keyword, word, mRecmanLearningDic, mBTreeLearningDic);
     }
 
-    public void addPrediction(String keyword, String word) {
-        if (keyword == null || word == null) {
+    public void addConnection(Candidate lastCandidate, Candidate followingCandidate) {
+        if (lastCandidate == null || followingCandidate == null) {
             return;
         }
-        Matcher matcher = punctuationPattern.matcher(keyword);
+        Matcher matcher = punctuationPattern.matcher(lastCandidate.value);
         if (matcher.find()) {
             // 直前の語句が句読点を含むなら登録しない
             return;
         }
-        add(keyword, word, mRecmanPredictionDic, mBTreePredictionDic);
+        String last = lastCandidate.key + " " + lastCandidate.value;
+        String following = followingCandidate.key + " " + followingCandidate.value;
+        add(last, following, mRecmanConnectionDic, mBTreeConnectionDic);
     }
 
     public void importDictionary(ArrayList<String> entries, RecordManager recman, BTree btree) {
@@ -350,8 +364,8 @@ public class Dictionary implements SharedPreferences.OnSharedPreferenceChangeLis
         importDictionary(entries, mRecmanLearningDic, mBTreeLearningDic);
     }
 
-    public void importPredictionDictionary(ArrayList<String> entries) {
-        importDictionary(entries, mRecmanPredictionDic, mBTreePredictionDic);
+    public void importConnectionDictionary(ArrayList<String> entries) {
+        importDictionary(entries, mRecmanConnectionDic, mBTreeConnectionDic);
     }
 
     private ArrayList<String> exportDictionary(RecordManager recman, BTree btree) {
@@ -372,7 +386,7 @@ public class Dictionary implements SharedPreferences.OnSharedPreferenceChangeLis
         return exportDictionary(mRecmanLearningDic, mBTreeLearningDic);
     }
 
-    public ArrayList<String> exportPredictionDictionary() {
-        return exportDictionary(mRecmanPredictionDic, mBTreePredictionDic);
+    public ArrayList<String> exportConnectionDictionary() {
+        return exportDictionary(mRecmanConnectionDic, mBTreeConnectionDic);
     }
 }
