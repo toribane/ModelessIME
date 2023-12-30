@@ -6,9 +6,6 @@
 
 [![Workflow](https://github.com/kachaya/ModelessIME/actions/workflows/android.yml/badge.svg)](https://github.com/kachaya/ModelessIME/actions/workflows/android.yml)
 
-ビルド済みバイナリは上のボタンから最新のworkflowを選択して、
-Artifactsのzipファイルをダウンロードしてください。
-
 ## 概要
 Android用のモードレスIMEを作るプロジェクトです。
 
