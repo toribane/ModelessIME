@@ -217,7 +217,7 @@ public class Dictionary implements SharedPreferences.OnSharedPreferenceChangeLis
                     if (!tupleKey.startsWith(hiragana)) {
                         break;
                     }
-                    if (tupleKey.length() > hiragana.length() + 2) {
+                    if (tupleKey.length() > hiragana.length() + 3) {
                         break;  // 補完する文字数制限 TODO:設定項目にする
                     }
                     for (String candidate : ((String) tuple.getValue()).split("\t")) {

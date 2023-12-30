@@ -1,13 +1,29 @@
 # ModelessIME
 モードレスIME
 
+「あa1」ボタンや「半角/全角」キーなどによる入力モード切り替えをおこなわずに、
+英数字やかな漢字を入力するIMEです。
+
 [![Workflow](https://github.com/kachaya/ModelessIME/actions/workflows/android.yml/badge.svg)](https://github.com/kachaya/ModelessIME/actions/workflows/android.yml)
+
+ビルド済みバイナリは上のボタンから最新のworkflowを選択して、
+Artifactsのzipファイルをダウンロードしてください。
 
 ## 概要
 Android用のモードレスIMEを作るプロジェクトです。
 
-「あa1」ボタンや「半角/全角」キーなどによる入力モード切り替えをおこなわずに、
-英数字やかな漢字を入力するIMEです。
+辞書データとしてSudachi辞書の語彙を使用しています。
+
+かな漢字変換は単語の変換のみですが、
+曖昧辞書検索と予測変換で入力する文字数を少なくできるようにしています。
+
+## 使用法
+画面キーボードから英数字を入力すると候補ビューに変換候補が表示されます。
+
+スペースキーで候補を選択してEnterを入力すると候補が確定入力されます。
+スペースキーを使わずに候補を直接タップしても確定入力されます。
+
+変換せずにEnterを入力すると入力した英数字文字列がそのまま確定入力されます。
 
 PalmのGraffiti入力のようなストローク入力が可能です。
 
@@ -100,7 +116,7 @@ limitations under the License.
 
 ```
 
-本ソフトウェアでは辞書データとして SudachiDict を使用しています。
+本ソフトウェアでは辞書データとして SudachiDict の語彙を使用しています。
 ```text
 SudachiDict by Works Applications Co., Ltd. is licensed under the [Apache License, Version2.0](http://www.apache.org/licenses/LICENSE-2.0.html)
 
