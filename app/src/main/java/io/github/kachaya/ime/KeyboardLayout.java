@@ -17,23 +17,24 @@
 package io.github.kachaya.ime;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.drawable.Drawable;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.AttributeSet;
-import android.view.ViewConfiguration;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.content.res.ResourcesCompat;
+import androidx.preference.PreferenceManager;
 
 import java.util.ArrayList;
 
-public class KeyboardLayout extends LinearLayout {
+public class KeyboardLayout extends LinearLayout implements SharedPreferences.OnSharedPreferenceChangeListener {
 
     public final static int SOFTKEY_ID_SPACE = -1;
     public final static int SOFTKEY_ID_BACKSPACE = -2;
@@ -61,7 +62,6 @@ public class KeyboardLayout extends LinearLayout {
     public SoftKey mSpaceKey;
     public SoftKey mSymbolViewKey;
     public SoftKey mSymbolKey;
-    public SoftKey mKigouKey;
     public ArrayList<SoftKey> mSoftKeys;
 
     public Bitmap mBitmap;
@@ -104,9 +104,11 @@ public class KeyboardLayout extends LinearLayout {
         super(context, attrs);
         mContext = context;
         mSoftKeyboard = (SoftKeyboard) context;
+        SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(context);
+        sharedPreferences.registerOnSharedPreferenceChangeListener(this);
 
-        mRepeatTimeout = ViewConfiguration.getKeyRepeatTimeout();
-        mRepeatDelay = ViewConfiguration.getKeyRepeatDelay();
+        mRepeatTimeout = Integer.parseInt(sharedPreferences.getString("key_repeat_timeout", "400"));
+        mRepeatDelay = Integer.parseInt(sharedPreferences.getString("key_repeat_delay", "50"));
         mRepeatHandler = new Handler(Looper.getMainLooper());
 
         mBackgroundColor = getResources().getColor(R.color.background, null);
@@ -164,6 +166,18 @@ public class KeyboardLayout extends LinearLayout {
         mEnterKey = new SoftKey(SOFTKEY_ID_ENTER);
         mEnterKey.setColor(mKeyForegroundColor, mFunctionKeyBackgroundColor);
         mEnterKey.setCharacter('⏎');   // u23CE
+    }
+
+    @Override
+    public void onSharedPreferenceChanged(SharedPreferences sharedPreferences, @Nullable String key) {
+        if (key == null) {
+            return;
+        }
+        if (key.equals("key_repeat_timeout")) {
+            mRepeatTimeout = Integer.parseInt(sharedPreferences.getString(key, "400"));
+        } else if (key.equals("key_repeat_delay")) {
+            mRepeatDelay = Integer.parseInt(sharedPreferences.getString(key, "50"));
+        }
     }
 
     public void processSoftKey(@NonNull SoftKey softKey) {

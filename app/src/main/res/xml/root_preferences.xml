@@ -13,6 +13,22 @@
             android:title="キーボードレイアウト"
             app:iconSpaceReserved="false"
             app:useSimpleSummaryProvider="true" />
+        <ListPreference
+            android:defaultValue="400"
+            android:entries="@array/key_repeat_timeout_entries"
+            android:entryValues="@array/key_repeat_timeout_values"
+            android:key="key_repeat_timeout"
+            app:iconSpaceReserved="false"
+            app:title="キーリピートが始まるまでの時間"
+            app:useSimpleSummaryProvider="true" />
+        <ListPreference
+            android:defaultValue="50"
+            android:entries="@array/key_repeat_delay_entries"
+            android:entryValues="@array/key_repeat_delay_values"
+            android:key="key_repeat_delay"
+            app:iconSpaceReserved="false"
+            app:title="キーリピートの間隔"
+            app:useSimpleSummaryProvider="true" />
     </PreferenceCategory>
     <PreferenceCategory
         android:title="変換設定"
