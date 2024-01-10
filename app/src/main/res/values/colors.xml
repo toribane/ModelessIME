@@ -20,4 +20,5 @@
     <color name="character_key_background">#FF333333</color>
     <color name="function_key_background">#FF222222</color>
     <color name="key_foreground">#FFFFFFFF</color>
+    <color name="select_bg">#8000FF00</color>
 </resources>

@@ -38,7 +38,7 @@ PalmのGraffiti入力のようなストローク入力が可能です。
 - [x] 活用形対応、「見た」「来た」「勝った」など
 - [x] シンボル入力
 - [x] 辞書ツール
-- [ ] カーソルキーによる入力中の文節変更
+- [x] カーソルキーによる入力中の文節変更
 - [ ] 候補表示の高速化
 - [ ] 辞書ツールでの編集
 - [ ] 後から変換
@@ -47,7 +47,7 @@ PalmのGraffiti入力のようなストローク入力が可能です。
 ## ライセンス等
 本ソフトウェアには Apache ライセンスが適用されます。
 ```
-Copyright 2023 kachaya
+Copyright 2023-2024 kachaya
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.

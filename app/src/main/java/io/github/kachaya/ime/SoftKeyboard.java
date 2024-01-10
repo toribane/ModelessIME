@@ -19,6 +19,10 @@ package io.github.kachaya.ime;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.inputmethodservice.InputMethodService;
+import android.text.SpannableString;
+import android.text.Spanned;
+import android.text.style.BackgroundColorSpan;
+import android.text.style.UnderlineSpan;
 import android.view.ContextThemeWrapper;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
@@ -29,6 +33,7 @@ import android.view.inputmethod.InputConnection;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import androidx.core.content.ContextCompat;
 import androidx.preference.PreferenceManager;
 
 public class SoftKeyboard extends InputMethodService {
@@ -41,9 +46,16 @@ public class SoftKeyboard extends InputMethodService {
     private SymbolView mSymbolView;
     private String mKeyboardLayout;
 
+    /** 入力テキスト */
     private StringBuilder mInputText;
+    /** 変換対象長 */
+    private int mConvertLength;
+
+    /** 予測中 */
     private boolean isPrediction;
+    /** 選択中の候補 */
     private int mCandidateIndex;
+
     private Dictionary mDictionary;
     private Candidate[] mCandidates;
     private Candidate mLastCandidate;
@@ -89,16 +101,23 @@ public class SoftKeyboard extends InputMethodService {
                 break;
         }
         mInputText.setLength(0);
+        mConvertLength = 0;
         mCandidateLayout.removeAllViewsInLayout();
         mCandidateIndex = -1;
         mLastCandidate = null;
     }
 
-    private void icSetComposingText(CharSequence cs) {
+    private void icSetComposingText() {
         InputConnection ic = getCurrentInputConnection();
-        if (ic != null) {
-            ic.setComposingText(cs, 1);
+        if (ic == null) {
+            return;
         }
+        SpannableString ss = new SpannableString(mInputText);
+        int color = ContextCompat.getColor(this, R.color.select_bg);
+        ss.setSpan(new BackgroundColorSpan(color), 0, mConvertLength, Spanned.SPAN_COMPOSING);
+        ss.setSpan(new UnderlineSpan(), 0, ss.length(), Spanned.SPAN_COMPOSING);
+
+        ic.setComposingText(ss, 1);
     }
 
     private void icCommitText(CharSequence cs) {
@@ -110,8 +129,9 @@ public class SoftKeyboard extends InputMethodService {
 
     // 入力中テキストをコミット
     private void commitInputText() {
-        icCommitText(mInputText.toString());
+        icCommitText(mInputText);
         mInputText.setLength(0);
+        mConvertLength = 0;
         mCandidateLayout.removeAllViewsInLayout();
         mCandidateIndex = -1;
     }
@@ -121,27 +141,35 @@ public class SoftKeyboard extends InputMethodService {
      */
     private void commitCandidateText() {
         Candidate candidate = mCandidates[mCandidateIndex];
-        icCommitText(candidate.value);
-        mInputText.setLength(0);
+        mDictionary.addLearning(candidate.key, candidate.value);
+
+        if (mLastCandidate != null) {
+            mDictionary.addConnection(mLastCandidate, candidate);
+            mDictionary.addConcatenation(mLastCandidate, candidate);
+        }
+
         mCandidateLayout.removeAllViewsInLayout();
         mCandidateIndex = -1;
+        mLastCandidate = candidate;
 
         if (isPrediction) {
-            if (mLastCandidate != null) {
-                mDictionary.addConnection(mLastCandidate, candidate);
-                // 連接したものを学習
-                mDictionary.addConcatenation(mLastCandidate, candidate);
-            }
+            icCommitText(candidate.value);
+            mInputText.setLength(0);
+            mConvertLength = 0;
+            buildPredictionCandidate();
         } else {
-            mDictionary.addLearning(candidate.key, candidate.value);
-            if (mLastCandidate != null) {
-                mDictionary.addConnection(mLastCandidate, candidate);
-                // 連接したものを学習
-                mDictionary.addConcatenation(mLastCandidate, candidate);
+            if (mConvertLength == mInputText.length()) {
+                icCommitText(candidate.value);
+                mInputText.setLength(0);
+                mConvertLength = 0;
+                buildPredictionCandidate();
+            } else {
+                icCommitText(candidate.value);
+                mInputText.delete(0, mConvertLength);
+                mConvertLength = mInputText.length();
+                buildConversionCandidate();
             }
         }
-        mLastCandidate = candidate;
-        buildPredictionCandidate();
     }
 
     /**
@@ -151,10 +179,11 @@ public class SoftKeyboard extends InputMethodService {
      */
     public void handleString(String s) {
         if (mCandidateIndex >= 0) {
+            // 候補選択中なら確定する
             commitCandidateText();
         }
         mInputText.append(s);
-        icSetComposingText(mInputText);
+        icSetComposingText();
         buildConversionCandidate();
     }
 
@@ -165,10 +194,12 @@ public class SoftKeyboard extends InputMethodService {
      */
     public void handleCharacter(char c) {
         if (mCandidateIndex >= 0) {
+            // 候補選択中なら確定する
             commitCandidateText();
         }
         mInputText.append(c);
-        icSetComposingText(mInputText);
+        mConvertLength = mInputText.length();
+        icSetComposingText();
         buildConversionCandidate();
     }
 
@@ -176,9 +207,9 @@ public class SoftKeyboard extends InputMethodService {
      * Enterキー処理
      */
     public void handleEnter() {
-        mLastCandidate = null;  // 続く入力を連接させない
         if (mInputText.length() == 0) {
             // 未入力
+            mLastCandidate = null;  // 続く入力を連接させない
             sendDownUpKeyEvents(KeyEvent.KEYCODE_ENTER);
             return;
         }
@@ -201,6 +232,7 @@ public class SoftKeyboard extends InputMethodService {
     public void handleSpace() {
         if (mInputText.length() == 0) {
             // 未入力
+            mLastCandidate = null;  // 続く入力を連接させない
             sendDownUpKeyEvents(KeyEvent.KEYCODE_SPACE);
             return;
         }
@@ -211,6 +243,7 @@ public class SoftKeyboard extends InputMethodService {
     public void handleBackspace() {
         if (mInputText.length() == 0) {
             // 未入力
+            mLastCandidate = null;  // 続く入力を連接させない
             sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL);
             return;
         }
@@ -222,32 +255,55 @@ public class SoftKeyboard extends InputMethodService {
         }
         // 候補未選択→入力テキストの最後の文字を削除して候補を作り直す
         mInputText.deleteCharAt(mInputText.length() - 1);
-        icSetComposingText(mInputText);
+        mConvertLength = mInputText.length();
+        icSetComposingText();
         if (mInputText.length() == 0) {
             buildPredictionCandidate();
         } else {
             buildConversionCandidate();
         }
-        icSetComposingText(mInputText);
     }
 
     public void handleCursorLeft() {
         if (mInputText.length() == 0) {
             // 未入力
+            mLastCandidate = null;  // 続く入力を連接させない
             sendDownUpKeyEvents(KeyEvent.KEYCODE_DPAD_LEFT);
+            return;
         }
+        mConvertLength--;
+        if (mConvertLength < 1) {
+            mConvertLength = 1;
+        }
+        icSetComposingText();
+
+        isPrediction = false;
+        mCandidates = mDictionary.search(mInputText.substring(0, mConvertLength));
+        setCandidateText();
     }
 
     public void handleCursorRight() {
         if (mInputText.length() == 0) {
             // 未入力
+            mLastCandidate = null;  // 続く入力を連接させない
             sendDownUpKeyEvents(KeyEvent.KEYCODE_DPAD_RIGHT);
+            return;
         }
+        mConvertLength++;
+        if (mConvertLength > mInputText.length()) {
+            mConvertLength = mInputText.length();
+        }
+        icSetComposingText();
+
+        isPrediction = false;
+        mCandidates = mDictionary.search(mInputText.substring(0, mConvertLength));
+        setCandidateText();
     }
 
     public void handleCursorUp() {
         if (mInputText.length() == 0) {
             // 未入力
+            mLastCandidate = null;  // 続く入力を連接させない
             sendDownUpKeyEvents(KeyEvent.KEYCODE_DPAD_UP);
         }
     }
@@ -255,6 +311,7 @@ public class SoftKeyboard extends InputMethodService {
     public void handleCursorDown() {
         if (mInputText.length() == 0) {
             // 未入力
+            mLastCandidate = null;  // 続く入力を連接させない
             sendDownUpKeyEvents(KeyEvent.KEYCODE_DPAD_DOWN);
         }
     }
@@ -263,9 +320,14 @@ public class SoftKeyboard extends InputMethodService {
      * シンボルキーボードに切り替え
      */
     public void handleSymbol() {
+        if (mCandidateIndex >= 0) {
+            // 候補選択中なら確定する
+            commitCandidateText();
+        }
         if (mInputText.length() > 0) {
             commitInputText();
         }
+        mLastCandidate = null;  // 続く入力を連接させない
         mQwertyView.setVisibility(View.INVISIBLE);
         mStrokeView.setVisibility(View.INVISIBLE);
         mSymbolView.setVisibility(View.VISIBLE);
@@ -357,7 +419,6 @@ public class SoftKeyboard extends InputMethodService {
                     mCandidateView.scrollTo(bR - cW, bT);
                 }
                 view.setSelected(true);
-                icSetComposingText(view.getText());
             } else {
                 view.setSelected(false);
             }

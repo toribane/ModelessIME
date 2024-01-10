@@ -56,8 +56,10 @@ public class Dictionary implements SharedPreferences.OnSharedPreferenceChangeLis
     private BTree mBTreeLearningDic;
     private RecordManager mRecmanConnectionDic;
     private BTree mBTreeConnectionDic;
+    private int mSearchCounter;
     // 設定項目
     private boolean mConvertHalfkana;
+    private int mSearchLimit = 50;
 
     public Dictionary(Context context) {
         SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(context);
@@ -162,7 +164,81 @@ public class Dictionary implements SharedPreferences.OnSharedPreferenceChangeLis
         }
     }
 
+    /**
+     * 学習辞書内の完全一致する候補を返す
+     *
+     * @param key キー文字列
+     * @return 候補
+     */
+    private String[] findLearningDic(String key) {
+        ArrayList<String> list = new ArrayList<>();
+        try {
+            String value = (String) mBTreeLearningDic.find(key);
+            if (value != null) {
+                String[] words = value.split("\t");
+                for (String word : words) {
+                    list.add(key + "\t" + word);
+                }
+            }
+        } catch (IOException ignored) {
+        }
+        return list.toArray(new String[0]);
+    }
+
+    /**
+     * システム辞書内の完全一致する候補を返す
+     *
+     * @param key キー
+     * @return 候補
+     */
+    private String[] findSystemDic(String key) {
+        ArrayList<String> list = new ArrayList<>();
+        try {
+            String value = (String) mBTreeSystemDic.find(key);
+            if (value != null) {
+                String[] words = value.split("\t");
+                for (String word : words) {
+                    list.add(key + "\t" + word);
+                }
+            }
+        } catch (IOException ignored) {
+        }
+        return list.toArray(new String[0]);
+    }
+
+    private String[] browseSystemDic(String key) {
+        Tuple tuple = new Tuple();
+        TupleBrowser browser;
+        ArrayList<String> list = new ArrayList<>();
+        try {
+            browser = mBTreeSystemDic.browse(key);
+            while (browser.getNext(tuple)) {
+                String tupleKey = (String) tuple.getKey();
+                if (!tupleKey.startsWith(key)) {
+                    break;
+                }
+                if (tupleKey.length() > key.length() + 3) {
+                    break;  // 補完する文字数制限 TODO:設定項目にする
+                }
+                String value = (String) tuple.getValue();
+                if (value != null) {
+                    String[] words = value.split("\t");
+                    for (String word : words) {
+                        list.add(key + "\t" + word);
+                        mSearchCounter++;
+                    }
+                }
+                if (mSearchCounter > mSearchLimit) {
+                    break;
+                }
+            }
+        } catch (IOException ignored) {
+        }
+        return list.toArray(new String[0]);
+    }
+
     public Candidate[] search(String key) {
+        mSearchCounter = 0;
         Set<String> set = new LinkedHashSet<>();
         String hiragana = Converter.romajiToHiragana(key);
         boolean hiraganaOnly = true;
@@ -172,67 +248,23 @@ public class Dictionary implements SharedPreferences.OnSharedPreferenceChangeLis
                 break;
             }
         }
+        // 一致検索
         if (hiraganaOnly) {
-            set.add(hiragana + "\t" + hiragana);
+            set.addAll(Arrays.asList(findLearningDic(hiragana)));
         }
-        Tuple tuple = new Tuple();
-        TupleBrowser browser;
-        // 学習辞書
+        set.addAll(Arrays.asList(findLearningDic(key)));
         if (hiraganaOnly) {
-            try {
-                browser = mBTreeLearningDic.browse(hiragana);
-                while (browser.getNext(tuple)) {
-                    String tupleKey = (String) tuple.getKey();
-                    if (!tupleKey.startsWith(hiragana)) {
-                        break;
-                    }
-                    for (String candidate : ((String) tuple.getValue()).split("\t")) {
-                        set.add(tupleKey + "\t" + candidate);
-                    }
-                }
-            } catch (IOException ignored) {
-            }
+            set.addAll(Arrays.asList(findSystemDic(hiragana)));
         }
-        try {
-            browser = mBTreeLearningDic.browse(key);
-            while (browser.getNext(tuple)) {
-                String tupleKey = (String) tuple.getKey();
-                if (!tupleKey.startsWith(key)) {
-                    break;
-                }
-                for (String candidate : ((String) tuple.getValue()).split("\t")) {
-                    set.add(tupleKey + "\t" + candidate);
-                }
-            }
-        } catch (IOException ignored) {
-        }
-        // システム辞書
+
+        // 曖昧検索
         if (hiraganaOnly) {
-            int limit = 50; // 不完全一致候補上限 TODO:設定項目にする
-            int num = 0;
-            try {
-                browser = mBTreeSystemDic.browse(hiragana);
-                while (browser.getNext(tuple)) {
-                    String tupleKey = (String) tuple.getKey();
-                    if (!tupleKey.startsWith(hiragana)) {
-                        break;
-                    }
-                    if (tupleKey.length() > hiragana.length() + 3) {
-                        break;  // 補完する文字数制限 TODO:設定項目にする
-                    }
-                    for (String candidate : ((String) tuple.getValue()).split("\t")) {
-                        set.add(tupleKey + "\t" + candidate);
-                        num++;
-                    }
-                    if (num > limit) {
-                        break;
-                    }
-                }
-            } catch (IOException ignored) {
-            }
+            set.addAll(Arrays.asList(browseSystemDic(hiragana)));
         }
+
         // 辞書に無かったもの
         if (hiraganaOnly) {
+            set.add(hiragana + "\t" + hiragana);
             set.add(hiragana + "\t" + Converter.toWideKatakana(hiragana));
             if (mConvertHalfkana) {
                 set.add(hiragana + "\t" + Converter.toHalfKatakana(hiragana));
