@@ -96,7 +96,7 @@ public class Stroke {
                     new Chars('c', '4', '('),
                     new Chars('u', '0', 'N'),
             }, "m 0,12 12,-6 -12,-6"));            // '>'
-            // ()
+            // (
             add(new Model(new Chars[]{
                     new Chars('c', '4', '('),
                     new Chars('u', '0', 'N'),
@@ -104,11 +104,25 @@ public class Stroke {
                     new Chars('N', 'N', '^'),
             }, "m 9,0 -6,3 v 6 l 6,3"));      // '('
             add(new Model(new Chars[]{
+                    new Chars('c', '4', '('),
+                    new Chars('u', '0', 'N'),
+                    new Chars('N', 'N', '>'),
+                    new Chars('N', 'N', '^'),
+            }, "m 9,0 -6,0 v 12 l 6,0"));      // '('
+            // )
+            add(new Model(new Chars[]{
                     new Chars('t', '7', ')'),
                     new Chars('a', '1', '^'),
                     new Chars('N', 'N', '<'),
                     new Chars('v', '0', 'N'),
             }, "m 3,0 6,3 v 6 l -6,3"));      // ')'
+            add(new Model(new Chars[]{
+                    new Chars('t', '7', ')'),
+                    new Chars('a', '1', '^'),
+                    new Chars('N', 'N', '<'),
+                    new Chars('v', '0', 'N'),
+            }, "m 3,0 6,0 v 12 l -6,0"));      // ')'
+
             add(new Model(new Chars[]{
                     new Chars('c', '4', '('),
                     new Chars('u', '0', 'N'),
@@ -129,11 +143,24 @@ public class Stroke {
                     null,
             }, "m 12,0 -12,3 12,3 -12,3 12,3"));   // '{'
             add(new Model(new Chars[]{
+                    new Chars('e', '9', '{'),
+                    new Chars('w', 'N', 'N'),
+                    new Chars('N', 'N', ']'),
+                    null,
+            }, "m 10,0 -8,3 8,3 -8,3 8,3"));   // '{'
+
+            add(new Model(new Chars[]{
                     new Chars('b', '3', '}'),
                     new Chars('m', 'N', 'N'),
                     new Chars('N', 'N', '['),
                     null,
             }, "m 0,0 12,3 -12,3 12,3 -12,3")); // '}'
+            add(new Model(new Chars[]{
+                    new Chars('b', '3', '}'),
+                    new Chars('m', 'N', 'N'),
+                    new Chars('N', 'N', '['),
+                    null,
+            }, "m 2,0 8,3 -8,3 8,3 -8,3")); // '}'
             // 'k'
             add(new Model(new Chars[]{
                     new Chars('k', 'N', '+'),
@@ -258,6 +285,15 @@ public class Stroke {
                     new Chars('g', '6', 'N'),
                     null, null, null
             }, "m 8,0 -4,0 -2,8 v 4 h 8 v -4 h -8"));
+            // '8'
+            add(new Model(new Chars[]{
+                    new Chars('y', '8', '&'),
+                    null, null, null
+            }, "m 6,0 -4,3 8,6 -4,3 -4,-3 8,-6 -4,-3")); // 上から左の'8'
+            add(new Model(new Chars[]{
+                    new Chars('y', '8', '&'),
+                    null, null, null
+            }, "m 6,0 4,3 -8,6 4,3 4,-3 -8,-6 4,-3")); // 上から右の'8'
             add(new Model(new Chars[]{
                     new Chars('y', '8', '&'),
                     null, null, null
@@ -436,7 +472,7 @@ public class Stroke {
         Stroke inputStroke = new Stroke(path);
         Matrix matrixRotate = new Matrix();
         for (int index = 0; index < 4; index++) {
-            for (int rotate = -15; rotate <= 15; rotate += 5) {
+            for (int rotate = -10; rotate <= 10; rotate += 5) {
                 matrixRotate.reset();
                 matrixRotate.postRotate(90 * index + rotate);
                 Path testPath = new Path(path);
