@@ -9,7 +9,7 @@
 ## 概要
 Android用のモードレスIMEを作るプロジェクトです。
 
-辞書データとしてSudachi辞書の語彙を使用しています。
+辞書データとしてMosc辞書の語彙を使用しています。
 
 かな漢字変換は単語の変換のみですが、
 曖昧辞書検索と予測変換で入力する文字数を少なくできるようにしています。
@@ -26,23 +26,6 @@ PalmのGraffiti入力のようなストローク入力が可能です。
 
 ストローク入力キーボードからのシンボルキーボードへの切り替えは
 左上から右下へのストロークを入力します。
-
-## TODO
-- [x] KeyboardViewを使わないSoftKeyboard
-- [x] ローマ字かな変換
-- [x] かな漢字変換
-- [x] 学習辞書
-- [x] 予測辞書
-- [x] Graffiti入力
-- [x] 表示速度改善
-- [x] 活用形対応、「見た」「来た」「勝った」など
-- [x] シンボル入力
-- [x] 辞書ツール
-- [x] カーソルキーによる入力中の文節変更
-- [ ] 候補表示の高速化
-- [ ] 辞書ツールでの編集
-- [ ] 後から変換
-
 
 ## ライセンス等
 本ソフトウェアには Apache ライセンスが適用されます。
@@ -113,24 +96,14 @@ limitations under the License.
 
 ```
 
-本ソフトウェアでは辞書データとして SudachiDict の語彙を使用しています。
+本ソフトウェアでは辞書データとしてMosc辞書の語彙(src/data/dictionary*)を使用しています。
+
+https://github.com/google/mozc/blob/master/LICENSE
+
 ```text
-SudachiDict by Works Applications Co., Ltd. is licensed under the [Apache License, Version2.0](http://www.apache.org/licenses/LICENSE-2.0.html)
+Files: src/data/dictionary*
 
-   Copyright (c) 2017-2023 Works Applications Co., Ltd.
-
-   Licensed under the Apache License, Version 2.0 (the "License");
-   you may not use this file except in compliance with the License.
-   You may obtain a copy of the License at
-
-       http://www.apache.org/licenses/LICENSE-2.0
-
-   Unless required by applicable law or agreed to in writing, software
-   distributed under the License is distributed on an "AS IS" BASIS,
-   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   See the License for the specific language governing permissions and
-   limitations under the License.
-
-This project includes UniDic and a part of NEologd.
+Public Domain Dataです。使用・変更・配布に関しては一切の制限をつけません。
+商品などに組み込むことも自由に行なってください。すでにいくつかの辞書には沖縄辞書が採用されています。
+勝手ながら、沖縄辞書に寄贈された辞書も in the Public Domain' 扱いとさせていただきます。
 ```
-SudachiDictの*_lex.csvファイルから本ソフトウェア用の辞書ファイルを生成するためのツールは[DicTool](https://github.com/kachaya/DicTool)で公開しています。

@@ -198,7 +198,8 @@ public class Dictionary implements SharedPreferences.OnSharedPreferenceChangeLis
             if (value != null) {
                 String[] words = value.split("\t");
                 for (String word : words) {
-                    list.add(key + "\t" + word);
+                    String[] ss = word.split(",", 3);
+                    list.add(key + "\t" + ss[2]);   // surface
                 }
             }
         } catch (IOException ignored) {
@@ -224,7 +225,8 @@ public class Dictionary implements SharedPreferences.OnSharedPreferenceChangeLis
                 if (value != null) {
                     String[] words = value.split("\t");
                     for (String word : words) {
-                        list.add(key + "\t" + word);
+                        String[] ss = word.split(",", 3);
+                        list.add(key + "\t" + ss[2]);   // surface
                         mSearchCounter++;
                     }
                 }
