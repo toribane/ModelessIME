@@ -4,7 +4,7 @@
 「あa1」ボタンや「半角/全角」キーなどによる入力モード切り替えをおこなわずに、
 英数字やかな漢字を入力するIMEです。
 
-[![Workflow](https://github.com/kachaya/ModelessIME/actions/workflows/android.yml/badge.svg)](https://github.com/kachaya/ModelessIME/actions/workflows/android.yml)
+[![Workflow](https://github.com/toribane/ModelessIME/actions/workflows/android.yml/badge.svg)](https://github.com/toribane/ModelessIME/actions/workflows/android.yml)
 
 ## 概要
 Android用のモードレスIMEを作るプロジェクトです。
